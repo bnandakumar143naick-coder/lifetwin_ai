@@ -6,12 +6,13 @@ Then open: http://127.0.0.1:5000
 """
 import os
 from functools import wraps
-app=Flask(__name__)
+
 
 from flask import (
     Flask, render_template, request, redirect, url_for, session, flash,
     jsonify, send_file
 )
+app=Flask(__name__)
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from database import get_db, init_db, DB_PATH
