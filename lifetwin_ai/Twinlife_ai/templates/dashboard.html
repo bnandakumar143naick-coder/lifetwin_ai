@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — LifeTwin AI{% endblock %}
+{% block content %}
+
+<div class="page-header">
+    <h1>Hello, {{ user.full_name.split(' ')[0] }} 👋</h1>
+    <p>Here's the current state of your Digital Health Twin.</p>
+</div>
+
+{% if alerts %}
+<div class="alert-box">
+    🚨 Emergency Health Alert — please seek medical attention
+    <ul>
+        {% for a in alerts %}<li>{{ a }}</li>{% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<div class="overall-score-block">
+    <div class="score-ring" style="font-size:0.9rem;">
+        <div class="label">Overall Health Score</div>
+        <div class="overall-score-num">{{ scores.overall }}<span style="font-size:1.2rem;">/100</span></div>
+        <div>BMI: {{ scores.bmi or '—' }} ({{ scores.bmi_category }})</div>
+    </div>
+    <div style="flex:1;">
+        <a href="{{ url_for('download_report') }}" class="btn" style="background:#fff;color:var(--teal-dark);">⬇ Download PDF Health Report</a>
+    </div>
+</div>
+
+<div class="card">
+    <h3>Health Scores</h3>
+    <div class="score-ring-grid">
+        {% for label, key in [('Physical','physical'),('Nutrition','nutrition'),('Sleep','sleep'),('Hydration','hydration'),('Mental','mental')] %}
+        <div class="score-item">
+            <div class="score-value">{{ scores[key] }}</div>
+            <div class="score-label">{{ label }}</div>
+            <div class="score-bar-track"><div class="score-bar-fill" style="width:{{ scores[key] }}%;"></div></div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="dash-grid">
+    <div>
+        <div class="card">
+            <h3>Future Disease Risk Prediction</h3>
+            {% for disease, v in disease_risks.items() %}
+            <div class="disease-bar-row">
+                <div class="top">
+                    <span><strong>{{ disease }}</strong></span>
+                    <span>{{ v.current_risk }}% now → {{ v.future_risk }}% in 5 yrs</span>
+                </div>
+                <div class="disease-track">
+                    <div class="disease-fill-current" style="width:{{ v.current_risk }}%;"></div>
+                    <div class="disease-fill-future" style="width:{{ v.future_risk }}%;"></div>
+                </div>
+                <div class="disease-reasons">{{ v.reasons | join(', ') }}</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="card">
+            <h3>Symptom Analysis</h3>
+            {% if symptom_results %}
+                {% for s in symptom_results %}
+                <div style="margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid var(--line);">
+                    <div class="card-row" style="margin-bottom:4px;">
+                        <strong>{{ s.symptom }}</strong>
+                        <span class="badge badge-{{ s.risk_level|lower }}">{{ s.risk_level }} Risk</span>
+                    </div>
+                    <div style="font-size:0.88rem; color:var(--muted);">Possible: {{ s.possible_conditions | join(', ') }}</div>
+                    <div style="font-size:0.88rem; margin-top:4px;">{{ s.advice }}</div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">No current symptoms logged. <a href="{{ url_for('symptoms') }}">Log symptoms →</a></div>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h3>Personalized Prevention Plan</h3>
+            <div class="plan-columns">
+                <div class="plan-col">
+                    <h4>🥗 Diet Plan</h4>
+                    <p><strong>Breakfast:</strong></p>
+                    <ul>{% for item in plan.diet.breakfast %}<li>{{ item }}</li>{% endfor %}</ul>
+                    <p><strong>Lunch:</strong></p>
+                    <ul>{% for item in plan.diet.lunch %}<li>{{ item }}</li>{% endfor %}</ul>
+                    <p><strong>Dinner:</strong></p>
+                    <ul>{% for item in plan.diet.dinner %}<li>{{ item }}</li>{% endfor %}</ul>
+                    <p><strong>Water Target:</strong> {{ plan.diet.water_target_l }} L/day</p>
+                    <p><strong>Avoid:</strong> {{ plan.diet.foods_to_avoid | join(', ') }}</p>
+                </div>
+                <div class="plan-col">
+                    <h4>🏃 Exercise Plan ({{ plan.exercise.level }})</h4>
+                    <table class="week-table">
+                        {% for day, activity in plan.exercise.weekly_schedule.items() %}
+                        <tr><td>{{ day }}</td><td>{{ activity }}</td></tr>
+                        {% endfor %}
+                    </table>
+                </div>
+                <div class="plan-col">
+                    <h4>🧘 Lifestyle Plan</h4>
+                    <p>{{ plan.lifestyle.sleep_schedule }}</p>
+                    <p>{{ plan.lifestyle.stress_management }}</p>
+                    <p>{{ plan.lifestyle.weight_management }}</p>
+                    <ul>{% for g in plan.lifestyle.daily_goals %}<li>{{ g }}</li>{% endfor %}</ul>
+                </div>
+                <div class="plan-col">
+                    <h4>🛡 Preventive Care</h4>
+                    <ul>
+                        <li>{{ plan.preventive_care.checkup_reminder }}</li>
+                        <li>{{ plan.preventive_care.medication_reminder }}</li>
+                        <li>{{ plan.preventive_care.vaccination_reminder }}</li>
+                        {% if plan.preventive_care.priority_screenings %}
+                            {% for s in plan.preventive_care.priority_screenings %}<li>{{ s }}</li>{% endfor %}
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <div class="card">
+            <h3>Monthly Progress</h3>
+            <canvas id="scoreChart" height="200"></canvas>
+        </div>
+        <div class="card">
+            <h3>Vitals Trend</h3>
+            <canvas id="vitalsChart" height="200"></canvas>
+        </div>
+        <div class="card">
+            <h3>Quick Actions</h3>
+            <p><a href="{{ url_for('data_entry') }}" class="btn btn-secondary btn-block" style="margin-bottom:8px;">➕ Log Vitals</a></p>
+            <p><a href="{{ url_for('symptoms') }}" class="btn btn-secondary btn-block" style="margin-bottom:8px;">🩺 Update Symptoms</a></p>
+            <p><a href="{{ url_for('lab_reports') }}" class="btn btn-secondary btn-block" style="margin-bottom:8px;">🧪 Add Lab Report</a></p>
+            <p><a href="{{ url_for('coach') }}" class="btn btn-secondary btn-block">💬 Ask AI Health Coach</a></p>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+const scoreHistory = {{ score_history | tojson }};
+const vitalsHistory = {{ vitals_history | tojson }};
+
+const scoreLabels = scoreHistory.map(r => r.computed_at.slice(5, 16));
+new Chart(document.getElementById('scoreChart'), {
+    type: 'line',
+    data: {
+        labels: scoreLabels,
+        datasets: [{
+            label: 'Overall Health Score',
+            data: scoreHistory.map(r => r.overall),
+            borderColor: '#0f6e5b',
+            backgroundColor: 'rgba(15,110,91,0.12)',
+            tension: 0.3,
+            fill: true,
+        }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100 } } }
+});
+
+const vitalsLabels = vitalsHistory.map(r => r.recorded_at.slice(5, 16));
+new Chart(document.getElementById('vitalsChart'), {
+    type: 'line',
+    data: {
+        labels: vitalsLabels,
+        datasets: [
+            { label: 'Systolic BP', data: vitalsHistory.map(r => r.systolic), borderColor: '#d97757', tension: 0.3 },
+            { label: 'Blood Sugar', data: vitalsHistory.map(r => r.blood_sugar), borderColor: '#c98a2c', tension: 0.3 },
+            { label: 'Heart Rate', data: vitalsHistory.map(r => r.heart_rate), borderColor: '#0f6e5b', tension: 0.3 },
+        ]
+    },
+    options: { plugins: { legend: { position: 'bottom' } } }
+});
+</script>
+{% endblock %}

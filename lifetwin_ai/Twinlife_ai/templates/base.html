@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}LifeTwin AI{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="navbar">
+    <div class="navbar-inner">
+        <a href="{{ url_for('home') }}" class="brand">
+            <span class="brand-icon">🫀</span> LifeTwin <span class="brand-accent">AI</span>
+        </a>
+        <nav class="nav-links">
+            {% if session.user_id %}
+                <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('profile') }}">Profile</a>
+                <a href="{{ url_for('data_entry') }}">Vitals</a>
+                <a href="{{ url_for('lab_reports') }}">Lab Reports</a>
+                <a href="{{ url_for('symptoms') }}">Symptoms</a>
+                <a href="{{ url_for('coach') }}">AI Coach</a>
+                <a href="{{ url_for('logout') }}" class="nav-btn-outline">Logout</a>
+            {% else %}
+                <a href="{{ url_for('login') }}">Login</a>
+                <a href="{{ url_for('register') }}" class="nav-btn">Get Started</a>
+            {% endif %}
+        </nav>
+    </div>
+</header>
+
+<main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-wrap">
+            {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="site-footer">
+    <p>LifeTwin AI — Building a Digital Health Twin that predicts future health risks before they become diseases.</p>
+    <p class="disclaimer">Disclaimer: LifeTwin AI provides general wellness insights based on self-reported data and is not a substitute for professional medical advice.</p>
+</footer>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

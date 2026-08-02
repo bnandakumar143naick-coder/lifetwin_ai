@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}AI Health Coach — LifeTwin AI{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Your AI Health Coach</h1>
+    <p>Ask questions about your health data, and get answers grounded in your own profile.</p>
+</div>
+
+<div class="chat-window">
+    <div class="chat-messages" id="chatMessages">
+        <div class="msg msg-ai">Hi! I'm your AI Health Coach. Ask me about your blood pressure, cholesterol, diet, exercise, sleep, or disease risk — I'll answer using your own health data.</div>
+    </div>
+    <div class="chat-input-row">
+        <input type="text" id="chatInput" placeholder="Ask a question about your health...">
+        <button class="btn btn-primary" id="sendBtn">Send</button>
+    </div>
+</div>
+
+<div class="suggested-qs">
+    <button class="chip" data-q="Why is my blood pressure high?">Why is my blood pressure high?</button>
+    <button class="chip" data-q="What should I eat today?">What should I eat today?</button>
+    <button class="chip" data-q="How can I reduce my cholesterol?">How can I reduce my cholesterol?</button>
+    <button class="chip" data-q="Why is my health score decreasing?">Why is my health score decreasing?</button>
+    <button class="chip" data-q="What exercises are best for me?">What exercises are best for me?</button>
+    <button class="chip" data-q="What is my diabetes risk?">What is my diabetes risk?</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const chatMessages = document.getElementById('chatMessages');
+const chatInput = document.getElementById('chatInput');
+const sendBtn = document.getElementById('sendBtn');
+
+function addMessage(text, who) {
+    const div = document.createElement('div');
+    div.className = 'msg ' + (who === 'user' ? 'msg-user' : 'msg-ai');
+    div.textContent = text;
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+async function sendQuestion(question) {
+    if (!question.trim()) return;
+    addMessage(question, 'user');
+    chatInput.value = '';
+    const thinking = document.createElement('div');
+    thinking.className = 'msg msg-ai';
+    thinking.textContent = 'Thinking...';
+    chatMessages.appendChild(thinking);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    try {
+        const res = await fetch('{{ url_for("api_coach") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question })
+        });
+        const data = await res.json();
+        thinking.textContent = data.answer;
+    } catch (e) {
+        thinking.textContent = "Sorry, something went wrong. Please try again.";
+    }
+}
+
+sendBtn.addEventListener('click', () => sendQuestion(chatInput.value));
+chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendQuestion(chatInput.value); });
+document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => sendQuestion(chip.dataset.q));
+});
+</script>
+{% endblock %}

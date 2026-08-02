@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Lab Reports — LifeTwin AI{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Laboratory Reports <span class="hint">(Optional)</span></h1>
+    <p>Add values from your most recent lab report to sharpen your disease risk predictions. Skip anything you don't have.</p>
+</div>
+
+<div class="card">
+    <form method="POST">
+        <div class="form-grid">
+            <div class="field">
+                <label for="hba1c">HbA1c (%)</label>
+                <input type="number" step="0.01" id="hba1c" name="hba1c" placeholder="e.g. 5.4">
+            </div>
+            <div class="field">
+                <label for="lab_cholesterol">Cholesterol — Lab (mg/dL)</label>
+                <input type="number" step="0.1" id="lab_cholesterol" name="lab_cholesterol" placeholder="e.g. 190">
+            </div>
+            <div class="field">
+                <label for="hemoglobin">Hemoglobin (g/dL)</label>
+                <input type="number" step="0.1" id="hemoglobin" name="hemoglobin" placeholder="e.g. 13.5">
+            </div>
+            <div class="field">
+                <label for="creatinine">Creatinine (mg/dL)</label>
+                <input type="number" step="0.01" id="creatinine" name="creatinine" placeholder="e.g. 0.9">
+            </div>
+            <div class="field">
+                <label for="liver_alt">Liver Function — ALT (U/L)</label>
+                <input type="number" step="0.1" id="liver_alt" name="liver_alt" placeholder="e.g. 28">
+            </div>
+            <div class="field">
+                <label for="liver_ast">Liver Function — AST (U/L)</label>
+                <input type="number" step="0.1" id="liver_ast" name="liver_ast" placeholder="e.g. 25">
+            </div>
+            <div class="field">
+                <label for="kidney_egfr">Kidney Function — eGFR</label>
+                <input type="number" step="0.1" id="kidney_egfr" name="kidney_egfr" placeholder="e.g. 95">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Save Lab Report</button>
+    </form>
+</div>
+
+{% if latest %}
+<div class="card">
+    <h3>Last Recorded ({{ latest.recorded_at }})</h3>
+    <table class="data-table">
+        <tr><th>HbA1c</th><td>{{ latest.hba1c or '-' }} %</td></tr>
+        <tr><th>Cholesterol</th><td>{{ latest.lab_cholesterol or '-' }} mg/dL</td></tr>
+        <tr><th>Hemoglobin</th><td>{{ latest.hemoglobin or '-' }} g/dL</td></tr>
+        <tr><th>Creatinine</th><td>{{ latest.creatinine or '-' }} mg/dL</td></tr>
+        <tr><th>Liver ALT / AST</th><td>{{ latest.liver_alt or '-' }} / {{ latest.liver_ast or '-' }} U/L</td></tr>
+        <tr><th>Kidney eGFR</th><td>{{ latest.kidney_egfr or '-' }}</td></tr>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

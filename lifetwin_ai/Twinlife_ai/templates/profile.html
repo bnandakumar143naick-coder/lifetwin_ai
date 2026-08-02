@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Health Profile — LifeTwin AI{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Your Health Profile</h1>
+    <p>This information powers every prediction your Health Twin makes. The more complete it is, the more accurate your insights will be.</p>
+</div>
+
+<form method="POST">
+    <fieldset>
+        <legend>Personal Information</legend>
+        <div class="form-grid">
+            <div class="field">
+                <label for="height_cm">Height (cm)</label>
+                <input type="number" step="0.1" id="height_cm" name="height_cm" value="{{ profile.height_cm or '' }}">
+            </div>
+            <div class="field">
+                <label for="weight_kg">Weight (kg)</label>
+                <input type="number" step="0.1" id="weight_kg" name="weight_kg" value="{{ profile.weight_kg or '' }}">
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Lifestyle Information</legend>
+        <div class="form-grid">
+            <div class="field">
+                <label for="smoking">Smoking</label>
+                <select id="smoking" name="smoking">
+                    {% for v in ['never','former','occasional','regular'] %}
+                    <option value="{{ v }}" {% if profile.smoking==v %}selected{% endif %}>{{ v|capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="alcohol">Alcohol Consumption</label>
+                <select id="alcohol" name="alcohol">
+                    {% for v in ['never','occasional','moderate','heavy'] %}
+                    <option value="{{ v }}" {% if profile.alcohol==v %}selected{% endif %}>{{ v|capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="exercise_freq">Exercise Frequency</label>
+                <select id="exercise_freq" name="exercise_freq">
+                    {% for v in ['none','rarely','1-2 times/week','3-4 times/week','daily'] %}
+                    <option value="{{ v }}" {% if profile.exercise_freq==v %}selected{% endif %}>{{ v }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="sleep_hours">Sleep Hours (avg/night)</label>
+                <input type="number" step="0.5" id="sleep_hours" name="sleep_hours" value="{{ profile.sleep_hours or '' }}">
+            </div>
+            <div class="field">
+                <label for="water_intake_l">Water Intake (L/day)</label>
+                <input type="number" step="0.1" id="water_intake_l" name="water_intake_l" value="{{ profile.water_intake_l or '' }}">
+            </div>
+            <div class="field">
+                <label for="stress_level">Stress Level</label>
+                <select id="stress_level" name="stress_level">
+                    {% for v in ['low','moderate','high','severe'] %}
+                    <option value="{{ v }}" {% if profile.stress_level==v %}selected{% endif %}>{{ v|capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="occupation">Occupation</label>
+                <input type="text" id="occupation" name="occupation" value="{{ profile.occupation or '' }}">
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Medical History</legend>
+        <div class="checkbox-grid">
+            {% set conditions = [('diabetes','Diabetes'),('hypertension','High Blood Pressure'),('heart_disease','Heart Disease'),('kidney_disease','Kidney Disease'),('asthma','Asthma'),('thyroid_disease','Thyroid Disease')] %}
+            {% for key, label in conditions %}
+            <label class="checkbox-row">
+                <input type="checkbox" name="{{ key }}" {% if profile.get(key) %}checked{% endif %}> {{ label }}
+            </label>
+            {% endfor %}
+        </div>
+        <div class="form-grid" style="margin-top: 12px;">
+            <div class="field">
+                <label for="allergies">Allergies</label>
+                <input type="text" id="allergies" name="allergies" value="{{ profile.allergies or '' }}" placeholder="e.g. Peanuts, Dust">
+            </div>
+            <div class="field">
+                <label for="current_medications">Current Medications</label>
+                <input type="text" id="current_medications" name="current_medications" value="{{ profile.current_medications or '' }}" placeholder="e.g. Metformin 500mg">
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Family Medical History</legend>
+        <div class="checkbox-grid">
+            {% set fam = [('family_diabetes','Diabetes'),('family_heart_disease','Heart Disease'),('family_stroke','Stroke'),('family_cancer','Cancer'),('family_kidney_disease','Kidney Disease')] %}
+            {% for key, label in fam %}
+            <label class="checkbox-row">
+                <input type="checkbox" name="{{ key }}" {% if profile.get(key) %}checked{% endif %}> {{ label }}
+            </label>
+            {% endfor %}
+        </div>
+    </fieldset>
+
+    <button type="submit" class="btn btn-primary">Save Health Profile</button>
+</form>
+{% endblock %}
