@@ -1,3 +1,4 @@
+
 import os
 from datetime import datetime
 
@@ -18,8 +19,8 @@ from utils.plan_generator import (
 from utils.health_coach import answer_question
 from utils.pdf_report import generate_pdf_report
 
-# --- Patient + Doctor + Family ecosystem (additive extension) ---
-import models_ecosystem  # noqa: F401  (registers the new tables before db.create_all())
+# Patient + Doctor + Family ecosystem
+import models_ecosystem  # noqa: F401
 from ecosystem import (
     register_ecosystem, ensure_ecosystem_schema,
     after_vitals_saved, after_lab_saved, after_symptoms_saved, after_profile_saved,
@@ -31,8 +32,34 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    os.makedirs(os.path.join(app.root_path, "instance"), exist_ok=True)
-    os.makedirs(Config.REPORTS_DIR, exist_ok=True)
+    # Vercel's application directory is read-only.
+    # Configure writable paths here, even if config.py is an older version.
+    if os.environ.get("VERCEL"):
+        instance_dir = "/tmp/lifetwin_instance"
+        os.makedirs(instance_dir, exist_ok=True)
+
+        # SQLite in /tmp is temporary. Use DATABASE_URL for persistent storage.
+        if not os.environ.get("DATABASE_URL"):
+            app.config["SQLALCHEMY_DATABASE_URI"] = (
+                "sqlite:///" + os.path.join(instance_dir, "lifetwin.db")
+            )
+
+        reports_dir = os.path.join(instance_dir, "reports")
+    else:
+        instance_dir = getattr(
+            Config, "INSTANCE_DIR",
+            os.path.join(app.root_path, "instance")
+        )
+        reports_dir = getattr(
+            Config, "REPORTS_DIR",
+            os.path.join(instance_dir, "reports")
+        )
+
+    app.config["INSTANCE_DIR"] = instance_dir
+    app.config["REPORTS_DIR"] = reports_dir
+
+    os.makedirs(instance_dir, exist_ok=True)
+    os.makedirs(reports_dir, exist_ok=True)
 
     db.init_app(app)
 
@@ -47,11 +74,12 @@ def create_app():
 
     with app.app_context():
         db.create_all()
-        ensure_ecosystem_schema(db)  # adds users.role/phone to pre-existing DBs; old users -> PATIENT
+        ensure_ecosystem_schema(db)
 
     # ---------- helper ----------
+
     def get_user_bundle():
-        """Fetch profile + latest vitals + latest labs + latest symptoms for current_user."""
+        """Fetch profile + latest vitals + latest labs + latest symptoms."""
         profile = current_user.profile
         vitals = current_user.vitals[-1] if current_user.vitals else None
         labs = current_user.labs[-1] if current_user.labs else None
@@ -62,24 +90,41 @@ def create_app():
         profile, vitals, labs, symptom_log = get_user_bundle()
         if not profile:
             return None
+
         scores = compute_all_scores(profile, vitals, labs)
         risks = predict_all_risks(current_user, profile, vitals, labs)
-        symptoms_list = symptom_log.symptoms.split(",") if symptom_log and symptom_log.symptoms else []
-        symptom_result = analyze_symptoms([s for s in symptoms_list if s], profile)
+
+        symptoms_list = (
+            symptom_log.symptoms.split(",")
+            if symptom_log and symptom_log.symptoms
+            else []
+        )
+        symptom_result = analyze_symptoms(
+            [s for s in symptoms_list if s], profile
+        )
+
         diet_plan = generate_diet_plan(profile, risks)
         exercise_plan = generate_exercise_plan(profile, risks)
         lifestyle_plan = generate_lifestyle_plan(profile, scores)
         preventive_care = generate_preventive_care(risks, current_user.age)
         emergency_alerts = check_emergency(vitals)
+
         return {
-            "profile": profile, "vitals": vitals, "labs": labs,
-            "scores": scores, "risks": risks, "symptom_result": symptom_result,
-            "diet_plan": diet_plan, "exercise_plan": exercise_plan,
-            "lifestyle_plan": lifestyle_plan, "preventive_care": preventive_care,
+            "profile": profile,
+            "vitals": vitals,
+            "labs": labs,
+            "scores": scores,
+            "risks": risks,
+            "symptom_result": symptom_result,
+            "diet_plan": diet_plan,
+            "exercise_plan": exercise_plan,
+            "lifestyle_plan": lifestyle_plan,
+            "preventive_care": preventive_care,
             "emergency_alerts": emergency_alerts,
         }
 
     # ---------- public ----------
+
     @app.route("/")
     def index():
         if current_user.is_authenticated:
@@ -103,10 +148,16 @@ def create_app():
                 flash("An account with this email already exists.", "error")
                 return render_template("register.html")
 
-            user = User(full_name=full_name, email=email, age=age, gender=gender)
+            user = User(
+                full_name=full_name,
+                email=email,
+                age=age,
+                gender=gender,
+            )
             user.set_password(password)
             db.session.add(user)
             db.session.commit()
+
             login_user(user)
             flash("Account created! Let's set up your health profile.", "success")
             return redirect(url_for("edit_profile"))
@@ -119,10 +170,13 @@ def create_app():
             email = request.form.get("email", "").strip().lower()
             password = request.form.get("password", "")
             user = User.query.filter_by(email=email).first()
+
             if user and user.check_password(password):
                 login_user(user)
                 return redirect(url_for("dashboard"))
+
             flash("Invalid email or password.", "error")
+
         return render_template("login.html")
 
     @app.route("/logout")
@@ -132,10 +186,12 @@ def create_app():
         return redirect(url_for("index"))
 
     # ---------- profile ----------
+
     @app.route("/profile", methods=["GET", "POST"])
     @login_required
     def edit_profile():
         profile = current_user.profile
+
         if request.method == "POST":
             if not profile:
                 profile = HealthProfile(user_id=current_user.id)
@@ -174,6 +230,7 @@ def create_app():
         return render_template("profile.html", profile=profile)
 
     # ---------- vitals / data entry ----------
+
     @app.route("/data-entry", methods=["GET", "POST"])
     @login_required
     def data_entry():
@@ -188,20 +245,24 @@ def create_app():
                 body_temperature=request.form.get("body_temperature", type=float),
                 cholesterol=request.form.get("cholesterol", type=float),
             )
+
             db.session.add(vitals)
             db.session.commit()
 
             alerts = check_emergency(vitals)
-            after_vitals_saved(current_user, vitals, alerts)  # notifies authorized doctors/family
+            after_vitals_saved(current_user, vitals, alerts)
+
             if alerts:
                 flash("⚠️ Emergency alert triggered — check your dashboard.", "error")
             else:
                 flash("Health data recorded.", "success")
+
             return redirect(url_for("dashboard"))
 
         return render_template("data_entry.html")
 
     # ---------- lab reports ----------
+
     @app.route("/labs", methods=["GET", "POST"])
     @login_required
     def labs():
@@ -219,9 +280,16 @@ def create_app():
 
             file = request.files.get("report_file")
             if file and file.filename:
-                uploads_dir = os.path.join(app.root_path, "instance", "uploads")
+                uploads_dir = os.path.join(
+                    app.config["INSTANCE_DIR"], "uploads"
+                )
                 os.makedirs(uploads_dir, exist_ok=True)
-                fname = f"user{current_user.id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename) or 'report'}"
+
+                fname = (
+                    f"user{current_user.id}_"
+                    f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_"
+                    f"{secure_filename(file.filename) or 'report'}"
+                )
                 fpath = os.path.join(uploads_dir, fname)
                 file.save(fpath)
                 lab.file_path = fname
@@ -235,21 +303,30 @@ def create_app():
         return render_template("labs.html")
 
     # ---------- symptoms ----------
+
     @app.route("/symptoms", methods=["GET", "POST"])
     @login_required
     def symptoms():
         if request.method == "POST":
             selected = request.form.getlist("symptoms")
-            log = SymptomLog(user_id=current_user.id, symptoms=",".join(selected))
+            log = SymptomLog(
+                user_id=current_user.id,
+                symptoms=",".join(selected),
+            )
+
             db.session.add(log)
             db.session.commit()
             after_symptoms_saved(current_user, log)
             flash("Symptoms recorded and analyzed.", "success")
             return redirect(url_for("dashboard"))
 
-        return render_template("symptoms.html", all_symptoms=list(SYMPTOM_MAP.keys()))
+        return render_template(
+            "symptoms.html",
+            all_symptoms=list(SYMPTOM_MAP.keys()),
+        )
 
     # ---------- dashboard ----------
+
     @app.route("/dashboard")
     @login_required
     def dashboard():
@@ -259,7 +336,7 @@ def create_app():
 
         data = compute_everything()
 
-        # save score history snapshot (once per session view is fine for a hackathon MVP)
+        # Save score history snapshot.
         hist = HealthScoreHistory(
             user_id=current_user.id,
             overall_score=data["scores"]["overall"],
@@ -283,14 +360,21 @@ def create_app():
 
         return render_template(
             "dashboard.html",
-            profile=data["profile"], vitals=data["vitals"], scores=data["scores"],
-            risks=data["risks"], symptom_result=data["symptom_result"],
-            diet_plan=data["diet_plan"], exercise_plan=data["exercise_plan"],
-            lifestyle_plan=data["lifestyle_plan"], preventive_care=data["preventive_care"],
-            emergency_alerts=data["emergency_alerts"], history=history,
+            profile=data["profile"],
+            vitals=data["vitals"],
+            scores=data["scores"],
+            risks=data["risks"],
+            symptom_result=data["symptom_result"],
+            diet_plan=data["diet_plan"],
+            exercise_plan=data["exercise_plan"],
+            lifestyle_plan=data["lifestyle_plan"],
+            preventive_care=data["preventive_care"],
+            emergency_alerts=data["emergency_alerts"],
+            history=history,
         )
 
     # ---------- AI coach ----------
+
     @app.route("/coach", methods=["GET", "POST"])
     @login_required
     def coach():
@@ -299,14 +383,26 @@ def create_app():
 
         answer = None
         question = None
+
         if request.method == "POST":
             question = request.form.get("question", "")
             data = compute_everything()
+
             answer = answer_question(
-                question, data["profile"], data["vitals"], data["scores"], data["risks"],
-                data["diet_plan"], data["exercise_plan"]
+                question,
+                data["profile"],
+                data["vitals"],
+                data["scores"],
+                data["risks"],
+                data["diet_plan"],
+                data["exercise_plan"],
             )
-        return render_template("coach.html", answer=answer, question=question)
+
+        return render_template(
+            "coach.html",
+            answer=answer,
+            question=question,
+        )
 
     @app.route("/coach/ask", methods=["POST"])
     @login_required
@@ -314,37 +410,66 @@ def create_app():
         payload = request.get_json(force=True)
         question = payload.get("question", "")
         data = compute_everything()
+
         answer = answer_question(
-            question, data["profile"], data["vitals"], data["scores"], data["risks"],
-            data["diet_plan"], data["exercise_plan"]
+            question,
+            data["profile"],
+            data["vitals"],
+            data["scores"],
+            data["risks"],
+            data["diet_plan"],
+            data["exercise_plan"],
         )
+
         return jsonify({"answer": answer})
 
     # ---------- PDF report ----------
+
     @app.route("/report/download")
     @login_required
     def download_report():
         data = compute_everything()
+
         if not data:
             flash("Please complete your health profile first.", "info")
             return redirect(url_for("edit_profile"))
 
-        fname = f"LifeTwin_Report_{current_user.id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.pdf"
-        fpath = os.path.join(Config.REPORTS_DIR, fname)
-        generate_pdf_report(
-            fpath, current_user, data["profile"], data["vitals"], data["symptom_result"],
-            data["scores"], data["risks"], data["diet_plan"], data["exercise_plan"],
-            data["preventive_care"]
+        fname = (
+            f"LifeTwin_Report_{current_user.id}_"
+            f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.pdf"
         )
-        return send_file(fpath, as_attachment=True, download_name="LifeTwin_Health_Report.pdf")
+        fpath = os.path.join(app.config["REPORTS_DIR"], fname)
 
-    register_ecosystem(app)  # doctor / family / messaging / notifications (new routes)
+        generate_pdf_report(
+            fpath,
+            current_user,
+            data["profile"],
+            data["vitals"],
+            data["symptom_result"],
+            data["scores"],
+            data["risks"],
+            data["diet_plan"],
+            data["exercise_plan"],
+            data["preventive_care"],
+        )
+
+        return send_file(
+            fpath,
+            as_attachment=True,
+            download_name="LifeTwin_Health_Report.pdf",
+        )
+
+    # Register doctor / family / messaging / notifications routes.
+    register_ecosystem(app)
     return app
 
 
 app = create_app()
 
+
 if __name__ == "__main__":
-    # Debugger is OFF and bound to localhost unless explicitly enabled (it allows remote code execution).
-    app.run(debug=os.environ.get("LIFETWIN_DEBUG", "0") == "1",
-            host=os.environ.get("LIFETWIN_HOST", "127.0.0.1"), port=int(os.environ.get("PORT", "5000")))
+    app.run(
+        debug=os.environ.get("LIFETWIN_DEBUG", "0") == "1",
+        host=os.environ.get("LIFETWIN_HOST", "127.0.0.1"),
+        port=int(os.environ.get("PORT", "5000")),
+    )
