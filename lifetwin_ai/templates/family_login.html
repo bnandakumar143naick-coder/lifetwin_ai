@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Family Login — LifeTwin AI{% endblock %}
+{% block content %}
+<div class="card" style="max-width:420px; margin:0 auto;">
+  <h2>Family Health View — Login</h2>
+  <p class="muted small">Your login is created by the patient who shares their health information with you.</p>
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Email</label><input type="email" name="email" required>
+    <label>Password</label><input type="password" name="password" required>
+    <button class="btn" type="submit">Login</button>
+  </form>
+  <p class="muted small" style="margin-top:14px;">Patient? <a href="{{ url_for('login') }}">Patient login</a></p>
+</div>
+{% endblock %}

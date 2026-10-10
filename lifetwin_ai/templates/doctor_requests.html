@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Patient Requests — LifeTwin AI{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>New patient connection requests</h2>
+  {% for c in pending %}
+  <div class="doc-card">
+    <div>
+      <h3>{{ c.patient.full_name }}</h3>
+      <div class="muted small">Age {{ c.patient.age }} · {{ c.patient.gender }} · requested {{ c.requested_at.strftime('%d %b %Y, %H:%M') }}</div>
+      <div class="muted small">No health data is shared until you accept.</div>
+    </div>
+    <div class="row-actions">
+      {% for act, label, cls in [('accept','Accept','btn-ok'),('reject','Reject','btn-outline'),('block','Block','btn-danger')] %}
+      <form method="POST" action="{{ url_for('doctor.request_action', cid=c.id, action=act) }}" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-sm {{ cls }}" type="submit">{{ label }}</button>
+      </form>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}<p class="empty">No pending requests.</p>{% endfor %}
+</div>
+{% if history %}
+<div class="card">
+  <h3>Recently declined / blocked</h3>
+  <table>
+    {% for c in history %}<tr><td>{{ c.patient.full_name }}</td><td><span class="pill pill-{{ c.status|lower }}">{{ c.status }}</span></td>
+      <td class="muted small">{{ c.responded_at.strftime('%d %b %Y') if c.responded_at else '' }}</td></tr>{% endfor %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}

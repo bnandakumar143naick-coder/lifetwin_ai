@@ -1,0 +1,21 @@
+{% if summaries %}
+<table>
+  <tr><th>Patient</th><th>Age</th><th>Health Score</th><th>Status</th><th>Last update</th><th></th></tr>
+  {% for s in summaries %}
+  <tr>
+    <td>{{ s.user.full_name }}</td>
+    <td>{{ s.user.age }}</td>
+    <td>{% if s.score is not none %}{{ s.score }}/100{% else %}—{% endif %}</td>
+    <td><span class="risk-badge risk-{{ s.css }}">{{ s.label }}</span></td>
+    <td class="small muted">{{ s.last_update.strftime('%d %b %Y') if s.last_update else '—' }}</td>
+    <td class="row-actions">
+      <a class="btn btn-sm" href="{{ url_for('doctor.patient_overview', pid=s.user.id) }}">Open</a>
+      <a class="btn btn-sm btn-outline" href="{{ url_for('doctor.thread', pid=s.user.id) }}">Message</a>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+<p class="muted small">Status is a display heuristic from the existing health score (≥75 Stable, ≥60 Attention, otherwise High Risk) and any active emergency threshold. It is not a diagnosis.</p>
+{% else %}
+<p class="empty">No connected patients yet. Patients appear here after you accept their connection request.</p>
+{% endif %}

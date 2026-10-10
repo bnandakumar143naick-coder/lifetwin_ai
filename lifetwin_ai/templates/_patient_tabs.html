@@ -1,0 +1,7 @@
+<div class="subnav">
+  <a class="{{ 'active' if tab == 'overview' }}" href="{{ url_for('doctor.patient_overview', pid=patient.id) }}">Overview</a>
+  <a class="{{ 'active' if tab == 'history' }}" href="{{ url_for('doctor.patient_history', pid=patient.id) }}">Health History</a>
+  <a class="{{ 'active' if tab == 'timeline' }}" href="{{ url_for('doctor.patient_timeline', pid=patient.id) }}">Timeline</a>
+  <a href="{{ url_for('doctor.thread', pid=patient.id) }}">💬 Messages</a>
+  <a href="{{ url_for('doctor.patient_report', pid=patient.id) }}">⬇ PDF Report</a>
+</div>

@@ -1,465 +1,350 @@
-"""
-app.py - LifeTwin AI main Flask application.
-
-Run with:  python app.py
-Then open: http://127.0.0.1:5000
-"""
 import os
-from functools import wraps
+from datetime import datetime
 
-
-from flask import (
-    Flask, render_template, request, redirect, url_for, session, flash,
-    jsonify, send_file
+from flask import Flask, render_template, redirect, url_for, request, flash, jsonify, send_file
+from flask_login import (
+    LoginManager, login_user, logout_user, login_required, current_user
 )
-app=Flask(__name__)
-from werkzeug.security import generate_password_hash, check_password_hash
 
-from database import get_db, init_db, DB_PATH
-import ai_engine
-from pdf_generator import build_health_report_pdf
+from config import Config
+from models import db, User, HealthProfile, VitalSigns, LabReport, SymptomLog, HealthScoreHistory
+from utils.health_score import compute_all_scores
+from utils.risk_predictor import predict_all_risks
+from utils.symptom_analyzer import analyze_symptoms, SYMPTOM_MAP
+from utils.emergency import check_emergency
+from utils.plan_generator import (
+    generate_diet_plan, generate_exercise_plan, generate_lifestyle_plan, generate_preventive_care
+)
+from utils.health_coach import answer_question
+from utils.pdf_report import generate_pdf_report
 
-app = Flask(__name__)
-app.secret_key = os.environ.get("LIFETWIN_SECRET_KEY", "dev-secret-key-change-in-production")
-
-SYMPTOM_OPTIONS = list(ai_engine.SYMPTOM_CONDITION_MAP.keys())
-
-
-# ---------------------------------------------------------------------------
-# Setup
-# ---------------------------------------------------------------------------
-
-@app.before_request
-def ensure_db():
-    if not os.path.exists(DB_PATH):
-        init_db()
-
-
-def login_required(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if "user_id" not in session:
-            flash("Please log in to continue.", "warning")
-            return redirect(url_for("login"))
-        return f(*args, **kwargs)
-    return wrapper
+# --- Patient + Doctor + Family ecosystem (additive extension) ---
+import models_ecosystem  # noqa: F401  (registers the new tables before db.create_all())
+from ecosystem import (
+    register_ecosystem, ensure_ecosystem_schema,
+    after_vitals_saved, after_lab_saved, after_symptoms_saved, after_profile_saved,
+)
+from werkzeug.utils import secure_filename
 
 
-# ---------------------------------------------------------------------------
-# Data access helpers
-# ---------------------------------------------------------------------------
+def create_app():
+    app = Flask(__name__)
+    app.config.from_object(Config)
 
-def get_user(user_id):
-    db = get_db()
-    row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-    db.close()
-    return row
+    os.makedirs(os.path.join(app.root_path, "instance"), exist_ok=True)
+    os.makedirs(Config.REPORTS_DIR, exist_ok=True)
 
+    db.init_app(app)
 
-def get_profile(user_id):
-    db = get_db()
-    row = db.execute("SELECT * FROM profiles WHERE user_id = ?", (user_id,)).fetchone()
-    db.close()
-    return dict(row) if row else {}
+    login_manager = LoginManager()
+    login_manager.login_view = "login"
+    login_manager.login_message = "Please log in to access LifeTwin AI."
+    login_manager.init_app(app)
 
+    @login_manager.user_loader
+    def load_user(user_id):
+        return db.session.get(User, int(user_id))
 
-def get_latest_vitals(user_id):
-    db = get_db()
-    row = db.execute(
-        "SELECT * FROM vitals WHERE user_id = ? ORDER BY recorded_at DESC, id DESC LIMIT 1", (user_id,)
-    ).fetchone()
-    db.close()
-    return dict(row) if row else None
+    with app.app_context():
+        db.create_all()
+        ensure_ecosystem_schema(db)  # adds users.role/phone to pre-existing DBs; old users -> PATIENT
 
+    # ---------- helper ----------
+    def get_user_bundle():
+        """Fetch profile + latest vitals + latest labs + latest symptoms for current_user."""
+        profile = current_user.profile
+        vitals = current_user.vitals[-1] if current_user.vitals else None
+        labs = current_user.labs[-1] if current_user.labs else None
+        symptom_log = current_user.symptom_logs[-1] if current_user.symptom_logs else None
+        return profile, vitals, labs, symptom_log
 
-def get_vitals_history(user_id, limit=12):
-    db = get_db()
-    rows = db.execute(
-        "SELECT * FROM vitals WHERE user_id = ? ORDER BY recorded_at ASC, id ASC LIMIT ?", (user_id, limit)
-    ).fetchall()
-    db.close()
-    return [dict(r) for r in rows]
+    def compute_everything():
+        profile, vitals, labs, symptom_log = get_user_bundle()
+        if not profile:
+            return None
+        scores = compute_all_scores(profile, vitals, labs)
+        risks = predict_all_risks(current_user, profile, vitals, labs)
+        symptoms_list = symptom_log.symptoms.split(",") if symptom_log and symptom_log.symptoms else []
+        symptom_result = analyze_symptoms([s for s in symptoms_list if s], profile)
+        diet_plan = generate_diet_plan(profile, risks)
+        exercise_plan = generate_exercise_plan(profile, risks)
+        lifestyle_plan = generate_lifestyle_plan(profile, scores)
+        preventive_care = generate_preventive_care(risks, current_user.age)
+        emergency_alerts = check_emergency(vitals)
+        return {
+            "profile": profile, "vitals": vitals, "labs": labs,
+            "scores": scores, "risks": risks, "symptom_result": symptom_result,
+            "diet_plan": diet_plan, "exercise_plan": exercise_plan,
+            "lifestyle_plan": lifestyle_plan, "preventive_care": preventive_care,
+            "emergency_alerts": emergency_alerts,
+        }
 
-
-def get_latest_lab(user_id):
-    db = get_db()
-    row = db.execute(
-        "SELECT * FROM lab_reports WHERE user_id = ? ORDER BY recorded_at DESC, id DESC LIMIT 1", (user_id,)
-    ).fetchone()
-    db.close()
-    return dict(row) if row else None
-
-
-def get_latest_symptoms(user_id):
-    db = get_db()
-    row = db.execute(
-        "SELECT * FROM symptoms_log WHERE user_id = ? ORDER BY recorded_at DESC, id DESC LIMIT 1", (user_id,)
-    ).fetchone()
-    db.close()
-    if row and row["symptoms_csv"]:
-        return [s for s in row["symptoms_csv"].split(",") if s]
-    return []
-
-
-def get_score_history(user_id, limit=12):
-    db = get_db()
-    rows = db.execute(
-        "SELECT * FROM health_scores WHERE user_id = ? ORDER BY computed_at ASC, id ASC LIMIT ?", (user_id, limit)
-    ).fetchall()
-    db.close()
-    return [dict(r) for r in rows]
-
-
-def save_score_snapshot(user_id, scores):
-    db = get_db()
-    db.execute(
-        "INSERT INTO health_scores (user_id, overall, physical, nutrition, sleep, hydration, mental) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (user_id, scores["overall"], scores["physical"], scores["nutrition"],
-         scores["sleep"], scores["hydration"], scores["mental"]),
-    )
-    db.commit()
-    db.close()
-
-
-def compute_full_analysis(user_id):
-    """Runs the full AI pipeline for a user and returns everything the dashboard/report needs."""
-    profile = get_profile(user_id)
-    latest_vitals = get_latest_vitals(user_id)
-    latest_lab = get_latest_lab(user_id)
-    current_symptoms = get_latest_symptoms(user_id)
-
-    scores = ai_engine.compute_health_scores(profile, latest_vitals)
-    symptom_results, highest_symptom_risk = ai_engine.analyze_symptoms(current_symptoms, profile, latest_vitals)
-    disease_risks = ai_engine.predict_disease_risks(profile, latest_vitals, latest_lab)
-    plan = ai_engine.generate_prevention_plan(profile, disease_risks)
-    alerts = ai_engine.check_emergency(latest_vitals)
-
-    return {
-        "profile": profile,
-        "latest_vitals": latest_vitals,
-        "latest_lab": latest_lab,
-        "current_symptoms": current_symptoms,
-        "scores": scores,
-        "symptom_results": symptom_results,
-        "highest_symptom_risk": highest_symptom_risk,
-        "disease_risks": disease_risks,
-        "plan": plan,
-        "alerts": alerts,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Module 1: Auth (Registration / Login)
-# ---------------------------------------------------------------------------
-
-@app.route("/")
-def home():
-    if "user_id" in session:
-        return redirect(url_for("dashboard"))
-    return render_template("index.html")
-
-
-@app.route("/register", methods=["GET", "POST"])
-def register():
-    if request.method == "POST":
-        full_name = request.form.get("full_name", "").strip()
-        email = request.form.get("email", "").strip().lower()
-        password = request.form.get("password", "")
-        age = request.form.get("age") or None
-        gender = request.form.get("gender") or None
-
-        if not full_name or not email or not password:
-            flash("Full name, email, and password are required.", "danger")
-            return render_template("register.html")
-
-        db = get_db()
-        existing = db.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
-        if existing:
-            db.close()
-            flash("An account with this email already exists.", "danger")
-            return render_template("register.html")
-
-        password_hash = generate_password_hash(password)
-        cur = db.execute(
-            "INSERT INTO users (full_name, email, password_hash, age, gender) VALUES (?, ?, ?, ?, ?)",
-            (full_name, email, password_hash, age, gender),
-        )
-        user_id = cur.lastrowid
-        db.execute("INSERT INTO profiles (user_id) VALUES (?)", (user_id,))
-        db.commit()
-        db.close()
-
-        session["user_id"] = user_id
-        session["full_name"] = full_name
-        flash("Account created successfully! Let's build your Health Profile.", "success")
-        return redirect(url_for("profile"))
-
-    return render_template("register.html")
-
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        email = request.form.get("email", "").strip().lower()
-        password = request.form.get("password", "")
-
-        db = get_db()
-        user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
-        db.close()
-
-        if user and check_password_hash(user["password_hash"], password):
-            session["user_id"] = user["id"]
-            session["full_name"] = user["full_name"]
-            flash(f"Welcome back, {user['full_name']}!", "success")
+    # ---------- public ----------
+    @app.route("/")
+    def index():
+        if current_user.is_authenticated:
             return redirect(url_for("dashboard"))
+        return render_template("index.html")
 
-        flash("Invalid email or password.", "danger")
+    @app.route("/register", methods=["GET", "POST"])
+    def register():
+        if request.method == "POST":
+            full_name = request.form.get("full_name", "").strip()
+            email = request.form.get("email", "").strip().lower()
+            password = request.form.get("password", "")
+            age = request.form.get("age", type=int)
+            gender = request.form.get("gender", "")
+
+            if not all([full_name, email, password, age, gender]):
+                flash("Please fill in all fields.", "error")
+                return render_template("register.html")
+
+            if User.query.filter_by(email=email).first():
+                flash("An account with this email already exists.", "error")
+                return render_template("register.html")
+
+            user = User(full_name=full_name, email=email, age=age, gender=gender)
+            user.set_password(password)
+            db.session.add(user)
+            db.session.commit()
+            login_user(user)
+            flash("Account created! Let's set up your health profile.", "success")
+            return redirect(url_for("edit_profile"))
+
+        return render_template("register.html")
+
+    @app.route("/login", methods=["GET", "POST"])
+    def login():
+        if request.method == "POST":
+            email = request.form.get("email", "").strip().lower()
+            password = request.form.get("password", "")
+            user = User.query.filter_by(email=email).first()
+            if user and user.check_password(password):
+                login_user(user)
+                return redirect(url_for("dashboard"))
+            flash("Invalid email or password.", "error")
         return render_template("login.html")
 
-    return render_template("login.html")
+    @app.route("/logout")
+    @login_required
+    def logout():
+        logout_user()
+        return redirect(url_for("index"))
 
+    # ---------- profile ----------
+    @app.route("/profile", methods=["GET", "POST"])
+    @login_required
+    def edit_profile():
+        profile = current_user.profile
+        if request.method == "POST":
+            if not profile:
+                profile = HealthProfile(user_id=current_user.id)
+                db.session.add(profile)
 
-@app.route("/logout")
-def logout():
-    session.clear()
-    flash("You have been logged out.", "success")
-    return redirect(url_for("home"))
+            profile.height_cm = request.form.get("height_cm", type=float)
+            profile.weight_kg = request.form.get("weight_kg", type=float)
+            profile.smoking = request.form.get("smoking")
+            profile.alcohol = request.form.get("alcohol")
+            profile.exercise_frequency = request.form.get("exercise_frequency")
+            profile.sleep_hours = request.form.get("sleep_hours", type=float)
+            profile.water_intake_l = request.form.get("water_intake_l", type=float)
+            profile.stress_level = request.form.get("stress_level")
+            profile.occupation = request.form.get("occupation")
 
+            profile.hist_diabetes = bool(request.form.get("hist_diabetes"))
+            profile.hist_hypertension = bool(request.form.get("hist_hypertension"))
+            profile.hist_heart_disease = bool(request.form.get("hist_heart_disease"))
+            profile.hist_kidney_disease = bool(request.form.get("hist_kidney_disease"))
+            profile.hist_asthma = bool(request.form.get("hist_asthma"))
+            profile.hist_thyroid = bool(request.form.get("hist_thyroid"))
+            profile.allergies = request.form.get("allergies")
+            profile.current_medications = request.form.get("current_medications")
 
-# ---------------------------------------------------------------------------
-# Module 2: Health Profile Creation
-# ---------------------------------------------------------------------------
+            profile.fam_diabetes = bool(request.form.get("fam_diabetes"))
+            profile.fam_heart_disease = bool(request.form.get("fam_heart_disease"))
+            profile.fam_stroke = bool(request.form.get("fam_stroke"))
+            profile.fam_cancer = bool(request.form.get("fam_cancer"))
+            profile.fam_kidney_disease = bool(request.form.get("fam_kidney_disease"))
 
-@app.route("/profile", methods=["GET", "POST"])
-@login_required
-def profile():
-    user_id = session["user_id"]
+            db.session.commit()
+            after_profile_saved(current_user)
+            flash("Health profile saved.", "success")
+            return redirect(url_for("dashboard"))
 
-    if request.method == "POST":
-        def f(name):
-            val = request.form.get(name)
-            return float(val) if val not in (None, "") else None
+        return render_template("profile.html", profile=profile)
 
-        def checkbox(name):
-            return 1 if request.form.get(name) == "on" else 0
+    # ---------- vitals / data entry ----------
+    @app.route("/data-entry", methods=["GET", "POST"])
+    @login_required
+    def data_entry():
+        if request.method == "POST":
+            vitals = VitalSigns(
+                user_id=current_user.id,
+                systolic_bp=request.form.get("systolic_bp", type=int),
+                diastolic_bp=request.form.get("diastolic_bp", type=int),
+                blood_sugar=request.form.get("blood_sugar", type=float),
+                heart_rate=request.form.get("heart_rate", type=int),
+                oxygen_saturation=request.form.get("oxygen_saturation", type=int),
+                body_temperature=request.form.get("body_temperature", type=float),
+                cholesterol=request.form.get("cholesterol", type=float),
+            )
+            db.session.add(vitals)
+            db.session.commit()
 
-        db = get_db()
-        db.execute(
-            """UPDATE profiles SET
-                height_cm=?, weight_kg=?, smoking=?, alcohol=?, exercise_freq=?,
-                sleep_hours=?, water_intake_l=?, stress_level=?, occupation=?,
-                diabetes=?, hypertension=?, heart_disease=?, kidney_disease=?, asthma=?, thyroid_disease=?,
-                allergies=?, current_medications=?,
-                family_diabetes=?, family_heart_disease=?, family_stroke=?, family_cancer=?, family_kidney_disease=?,
-                updated_at=datetime('now')
-               WHERE user_id=?""",
-            (
-                f("height_cm"), f("weight_kg"),
-                request.form.get("smoking"), request.form.get("alcohol"), request.form.get("exercise_freq"),
-                f("sleep_hours"), f("water_intake_l"), request.form.get("stress_level"),
-                request.form.get("occupation"),
-                checkbox("diabetes"), checkbox("hypertension"), checkbox("heart_disease"),
-                checkbox("kidney_disease"), checkbox("asthma"), checkbox("thyroid_disease"),
-                request.form.get("allergies"), request.form.get("current_medications"),
-                checkbox("family_diabetes"), checkbox("family_heart_disease"), checkbox("family_stroke"),
-                checkbox("family_cancer"), checkbox("family_kidney_disease"),
-                user_id,
-            ),
+            alerts = check_emergency(vitals)
+            after_vitals_saved(current_user, vitals, alerts)  # notifies authorized doctors/family
+            if alerts:
+                flash("⚠️ Emergency alert triggered — check your dashboard.", "error")
+            else:
+                flash("Health data recorded.", "success")
+            return redirect(url_for("dashboard"))
+
+        return render_template("data_entry.html")
+
+    # ---------- lab reports ----------
+    @app.route("/labs", methods=["GET", "POST"])
+    @login_required
+    def labs():
+        if request.method == "POST":
+            lab = LabReport(
+                user_id=current_user.id,
+                hba1c=request.form.get("hba1c", type=float),
+                fasting_blood_sugar=request.form.get("fasting_blood_sugar", type=float),
+                total_cholesterol=request.form.get("total_cholesterol", type=float),
+                hemoglobin=request.form.get("hemoglobin", type=float),
+                creatinine=request.form.get("creatinine", type=float),
+                liver_alt=request.form.get("liver_alt", type=float),
+                kidney_egfr=request.form.get("kidney_egfr", type=float),
+            )
+
+            file = request.files.get("report_file")
+            if file and file.filename:
+                uploads_dir = os.path.join(app.root_path, "instance", "uploads")
+                os.makedirs(uploads_dir, exist_ok=True)
+                fname = f"user{current_user.id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{secure_filename(file.filename) or 'report'}"
+                fpath = os.path.join(uploads_dir, fname)
+                file.save(fpath)
+                lab.file_path = fname
+
+            db.session.add(lab)
+            db.session.commit()
+            after_lab_saved(current_user, lab)
+            flash("Lab report saved.", "success")
+            return redirect(url_for("dashboard"))
+
+        return render_template("labs.html")
+
+    # ---------- symptoms ----------
+    @app.route("/symptoms", methods=["GET", "POST"])
+    @login_required
+    def symptoms():
+        if request.method == "POST":
+            selected = request.form.getlist("symptoms")
+            log = SymptomLog(user_id=current_user.id, symptoms=",".join(selected))
+            db.session.add(log)
+            db.session.commit()
+            after_symptoms_saved(current_user, log)
+            flash("Symptoms recorded and analyzed.", "success")
+            return redirect(url_for("dashboard"))
+
+        return render_template("symptoms.html", all_symptoms=list(SYMPTOM_MAP.keys()))
+
+    # ---------- dashboard ----------
+    @app.route("/dashboard")
+    @login_required
+    def dashboard():
+        if not current_user.profile:
+            flash("Please complete your health profile first.", "info")
+            return redirect(url_for("edit_profile"))
+
+        data = compute_everything()
+
+        # save score history snapshot (once per session view is fine for a hackathon MVP)
+        hist = HealthScoreHistory(
+            user_id=current_user.id,
+            overall_score=data["scores"]["overall"],
+            fitness_score=data["scores"]["fitness"]["score"],
+            nutrition_score=data["scores"]["nutrition"]["score"],
+            sleep_score=data["scores"]["sleep"]["score"],
+            hydration_score=data["scores"]["hydration"]["score"],
+            mental_score=data["scores"]["mental"]["score"],
         )
-        db.commit()
-        db.close()
-        flash("Health profile updated successfully.", "success")
-        return redirect(url_for("dashboard"))
+        db.session.add(hist)
+        db.session.commit()
 
-    profile_data = get_profile(user_id)
-    return render_template("profile.html", profile=profile_data)
+        history = [
+            {
+                "overall_score": h.overall_score,
+                "fitness_score": h.fitness_score,
+                "sleep_score": h.sleep_score,
+            }
+            for h in current_user.score_history[-12:]
+        ]
 
-
-# ---------------------------------------------------------------------------
-# Module 3: Health Data Entry (Vitals)
-# ---------------------------------------------------------------------------
-
-@app.route("/data-entry", methods=["GET", "POST"])
-@login_required
-def data_entry():
-    user_id = session["user_id"]
-
-    if request.method == "POST":
-        def f(name):
-            val = request.form.get(name)
-            return float(val) if val not in (None, "") else None
-
-        db = get_db()
-        db.execute(
-            "INSERT INTO vitals (user_id, systolic, diastolic, blood_sugar, heart_rate, spo2, temperature, cholesterol) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (user_id, f("systolic"), f("diastolic"), f("blood_sugar"), f("heart_rate"),
-             f("spo2"), f("temperature"), f("cholesterol")),
+        return render_template(
+            "dashboard.html",
+            profile=data["profile"], vitals=data["vitals"], scores=data["scores"],
+            risks=data["risks"], symptom_result=data["symptom_result"],
+            diet_plan=data["diet_plan"], exercise_plan=data["exercise_plan"],
+            lifestyle_plan=data["lifestyle_plan"], preventive_care=data["preventive_care"],
+            emergency_alerts=data["emergency_alerts"], history=history,
         )
-        db.commit()
-        db.close()
-        flash("Health data recorded successfully.", "success")
-        return redirect(url_for("dashboard"))
 
-    latest = get_latest_vitals(user_id)
-    return render_template("data_entry.html", latest=latest)
+    # ---------- AI coach ----------
+    @app.route("/coach", methods=["GET", "POST"])
+    @login_required
+    def coach():
+        if not current_user.profile:
+            return redirect(url_for("edit_profile"))
 
+        answer = None
+        question = None
+        if request.method == "POST":
+            question = request.form.get("question", "")
+            data = compute_everything()
+            answer = answer_question(
+                question, data["profile"], data["vitals"], data["scores"], data["risks"],
+                data["diet_plan"], data["exercise_plan"]
+            )
+        return render_template("coach.html", answer=answer, question=question)
 
-# ---------------------------------------------------------------------------
-# Module 4: Laboratory Reports (Optional)
-# ---------------------------------------------------------------------------
-
-@app.route("/lab-reports", methods=["GET", "POST"])
-@login_required
-def lab_reports():
-    user_id = session["user_id"]
-
-    if request.method == "POST":
-        def f(name):
-            val = request.form.get(name)
-            return float(val) if val not in (None, "") else None
-
-        db = get_db()
-        db.execute(
-            "INSERT INTO lab_reports (user_id, hba1c, lab_cholesterol, hemoglobin, creatinine, liver_alt, liver_ast, kidney_egfr) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (user_id, f("hba1c"), f("lab_cholesterol"), f("hemoglobin"), f("creatinine"),
-             f("liver_alt"), f("liver_ast"), f("kidney_egfr")),
+    @app.route("/coach/ask", methods=["POST"])
+    @login_required
+    def coach_ask():
+        payload = request.get_json(force=True)
+        question = payload.get("question", "")
+        data = compute_everything()
+        answer = answer_question(
+            question, data["profile"], data["vitals"], data["scores"], data["risks"],
+            data["diet_plan"], data["exercise_plan"]
         )
-        db.commit()
-        db.close()
-        flash("Lab report values saved successfully.", "success")
-        return redirect(url_for("dashboard"))
+        return jsonify({"answer": answer})
 
-    latest = get_latest_lab(user_id)
-    return render_template("lab_reports.html", latest=latest)
+    # ---------- PDF report ----------
+    @app.route("/report/download")
+    @login_required
+    def download_report():
+        data = compute_everything()
+        if not data:
+            flash("Please complete your health profile first.", "info")
+            return redirect(url_for("edit_profile"))
 
-
-# ---------------------------------------------------------------------------
-# Module 5: Current Symptoms
-# ---------------------------------------------------------------------------
-
-@app.route("/symptoms", methods=["GET", "POST"])
-@login_required
-def symptoms():
-    user_id = session["user_id"]
-
-    if request.method == "POST":
-        selected = request.form.getlist("symptoms")
-        db = get_db()
-        db.execute(
-            "INSERT INTO symptoms_log (user_id, symptoms_csv) VALUES (?, ?)",
-            (user_id, ",".join(selected)),
+        fname = f"LifeTwin_Report_{current_user.id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.pdf"
+        fpath = os.path.join(Config.REPORTS_DIR, fname)
+        generate_pdf_report(
+            fpath, current_user, data["profile"], data["vitals"], data["symptom_result"],
+            data["scores"], data["risks"], data["diet_plan"], data["exercise_plan"],
+            data["preventive_care"]
         )
-        db.commit()
-        db.close()
-        flash("Symptoms recorded. See your Symptom Analysis on the dashboard.", "success")
-        return redirect(url_for("dashboard"))
+        return send_file(fpath, as_attachment=True, download_name="LifeTwin_Health_Report.pdf")
 
-    current = get_latest_symptoms(user_id)
-    return render_template("symptoms.html", options=SYMPTOM_OPTIONS, current=current)
+    register_ecosystem(app)  # doctor / family / messaging / notifications (new routes)
+    return app
 
 
-# ---------------------------------------------------------------------------
-# Modules 6-11: Dashboard (Health Analysis, Symptom Analysis, Disease Risk,
-# Prevention Plan, Emergency Detection, Dashboard display)
-# ---------------------------------------------------------------------------
-
-@app.route("/dashboard")
-@login_required
-def dashboard():
-    user_id = session["user_id"]
-    user = get_user(user_id)
-    analysis = compute_full_analysis(user_id)
-
-    # Save a score snapshot for monthly progress tracking (once per data change is fine for MVP)
-    save_score_snapshot(user_id, analysis["scores"])
-
-    score_history = get_score_history(user_id)
-    vitals_history = get_vitals_history(user_id)
-
-    return render_template(
-        "dashboard.html",
-        user=user,
-        profile=analysis["profile"],
-        scores=analysis["scores"],
-        latest_vitals=analysis["latest_vitals"],
-        current_symptoms=analysis["current_symptoms"],
-        symptom_results=analysis["symptom_results"],
-        disease_risks=analysis["disease_risks"],
-        plan=analysis["plan"],
-        alerts=analysis["alerts"],
-        score_history=score_history,
-        vitals_history=vitals_history,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Module 12: AI Health Coach
-# ---------------------------------------------------------------------------
-
-@app.route("/coach", methods=["GET"])
-@login_required
-def coach():
-    return render_template("coach.html")
-
-
-@app.route("/api/coach", methods=["POST"])
-@login_required
-def api_coach():
-    user_id = session["user_id"]
-    question = request.json.get("question", "") if request.is_json else request.form.get("question", "")
-
-    analysis = compute_full_analysis(user_id)
-    answer = ai_engine.ai_coach_answer(
-        question, analysis["profile"], analysis["latest_vitals"], analysis["scores"], analysis["disease_risks"]
-    )
-    return jsonify({"answer": answer})
-
-
-# ---------------------------------------------------------------------------
-# Module 13: Download Health Report (PDF)
-# ---------------------------------------------------------------------------
-
-@app.route("/download-report")
-@login_required
-def download_report():
-    user_id = session["user_id"]
-    user = get_user(user_id)
-    analysis = compute_full_analysis(user_id)
-
-    pdf_buffer = build_health_report_pdf(
-        user=user,
-        profile=analysis["profile"],
-        latest_vitals=analysis["latest_vitals"],
-        scores=analysis["scores"],
-        symptom_results=analysis["symptom_results"],
-        disease_risks=analysis["disease_risks"],
-        plan=analysis["plan"],
-        alerts=analysis["alerts"],
-    )
-
-    filename = f"LifeTwinAI_Health_Report_{user['full_name'].replace(' ', '_')}.pdf"
-    return send_file(pdf_buffer, as_attachment=True, download_name=filename, mimetype="application/pdf")
-
-
-# ---------------------------------------------------------------------------
-# JSON API (used by dashboard charts)
-# ---------------------------------------------------------------------------
-
-@app.route("/api/score-history")
-@login_required
-def api_score_history():
-    return jsonify(get_score_history(session["user_id"]))
-
-
-@app.route("/api/vitals-history")
-@login_required
-def api_vitals_history():
-    return jsonify(get_vitals_history(session["user_id"]))
-
+app = create_app()
 
 if __name__ == "__main__":
-    init_db()
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    # Debugger is OFF and bound to localhost unless explicitly enabled (it allows remote code execution).
+    app.run(debug=os.environ.get("LIFETWIN_DEBUG", "0") == "1",
+            host=os.environ.get("LIFETWIN_HOST", "127.0.0.1"), port=int(os.environ.get("PORT", "5000")))

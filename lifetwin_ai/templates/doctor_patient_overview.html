@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}{{ patient.full_name }} — Patient Health Profile{% endblock %}
+{% block content %}
+<h1>Patient health profile</h1>
+<p class="muted">{{ patient.full_name }} · Age {{ patient.age }} · {{ patient.gender }}</p>
+{% include "_patient_tabs.html" %}
+{% include "_ai_disclaimer.html" %}
+
+{% if not twin %}
+<div class="card"><p class="empty">This patient has not completed their health profile yet, so no analysis is available.</p></div>
+{% else %}
+{% if twin.emergency_alerts %}
+<div class="alert-box">🚨 Emergency threshold detected in the latest vitals (automated alert, not a diagnosis)
+  <ul>{% for a in twin.emergency_alerts %}<li>{{ a }}</li>{% endfor %}</ul></div>
+{% endif %}
+
+<div class="card">
+  <h2>Health score</h2>
+  <div class="grid grid-3">
+    <div class="score-card"><div class="score-circle" style="--pct:{{ twin.scores.overall }}"><div class="inner">{{ twin.scores.overall }}</div></div><h4>Overall</h4></div>
+    {% for label, key in [("Fitness","fitness"),("Nutrition","nutrition"),("Sleep","sleep"),("Hydration","hydration"),("Mental Wellness","mental")] %}
+    <div class="score-card"><div class="score-circle" style="--pct:{{ twin.scores[key].score }}"><div class="inner">{{ twin.scores[key].score }}</div></div><h4>{{ label }}</h4>
+      {% if twin.scores[key].reasons %}<ul class="score-reasons">{% for r in twin.scores[key].reasons[:2] %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}</div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <div class="card"><h2>Vitals</h2>
+    {% if twin.vitals %}{% set v = twin.vitals %}
+    <table>
+      <tr><td>Blood Pressure</td><td>{{ v.systolic_bp or '-' }}/{{ v.diastolic_bp or '-' }} mmHg</td></tr>
+      <tr><td>Heart Rate</td><td>{{ v.heart_rate or '-' }} bpm</td></tr>
+      <tr><td>SpO2</td><td>{{ v.oxygen_saturation or '-' }} %</td></tr>
+      <tr><td>Temperature</td><td>{{ v.body_temperature or '-' }} °C</td></tr>
+      <tr><td>Blood Sugar</td><td>{{ v.blood_sugar or '-' }} mg/dL</td></tr>
+    </table><p class="muted small">Recorded {{ v.recorded_at.strftime('%d %b %Y, %H:%M') }}</p>
+    {% else %}<p class="empty">No vitals recorded.</p>{% endif %}
+  </div>
+  <div class="card"><h2>Lab results</h2>
+    {% if twin.labs %}{% set l = twin.labs %}
+    <table>
+      <tr><td>HbA1c</td><td>{{ l.hba1c if l.hba1c is not none else '-' }}</td></tr>
+      <tr><td>Fasting blood sugar</td><td>{{ l.fasting_blood_sugar if l.fasting_blood_sugar is not none else '-' }}</td></tr>
+      <tr><td>Total cholesterol</td><td>{{ l.total_cholesterol if l.total_cholesterol is not none else '-' }}</td></tr>
+      <tr><td>Hemoglobin</td><td>{{ l.hemoglobin if l.hemoglobin is not none else '-' }}</td></tr>
+      <tr><td>Creatinine</td><td>{{ l.creatinine if l.creatinine is not none else '-' }}</td></tr>
+      <tr><td>ALT</td><td>{{ l.liver_alt if l.liver_alt is not none else '-' }}</td></tr>
+      <tr><td>eGFR</td><td>{{ l.kidney_egfr if l.kidney_egfr is not none else '-' }}</td></tr>
+    </table>
+    <p class="muted small">Recorded {{ l.recorded_at.strftime('%d %b %Y') }}
+      {% if l.file_path %}· <a href="{{ url_for('doctor.patient_lab_file', pid=patient.id, lab_id=l.id) }}">Download uploaded report</a>{% endif %}</p>
+    {% else %}<p class="empty">No lab results.</p>{% endif %}
+  </div>
+</div>
+
+<div class="card"><h2>Risk analysis <span class="muted small">(explainable, rule-based)</span></h2>
+  <table>
+    <tr><th>Condition</th><th>Current</th><th>Projected (~5 yrs)</th><th>Contributing factors</th></tr>
+    {% for disease, r in twin.risks.items() %}
+    <tr><td>{{ disease }}</td>
+      <td><span class="risk-badge risk-{{ 'high' if r.current >= 60 else ('medium' if r.current >= 30 else 'low') }}">{{ r.current }}%</span></td>
+      <td>{{ r.future }}%</td>
+      <td class="small muted">{{ r.reasons|join('; ') if r.reasons else '—' }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="grid grid-2">
+  <div class="card"><h2>Symptoms</h2>
+    {% if twin.symptoms_list %}
+      <p>{{ twin.symptoms_list|join(', ') }}</p>
+      <p class="muted small">Logged {{ twin.symptom_log.recorded_at.strftime('%d %b %Y, %H:%M') }} · Triage level:
+        <span class="risk-badge risk-{{ twin.symptom_result.risk_level|lower }}">{{ twin.symptom_result.risk_level }}</span></p>
+      <ul class="small">{% for a in twin.symptom_result.advice %}<li>{{ a }}</li>{% endfor %}</ul>
+    {% else %}<p class="empty">No symptoms logged.</p>{% endif %}
+  </div>
+  <div class="card"><h2>Lifestyle</h2>{% set p = twin.profile %}
+    <dl class="kv">
+      <dt>BMI</dt><dd>{{ p.bmi or '—' }}</dd>
+      <dt>Exercise</dt><dd>{{ p.exercise_frequency or '—' }}</dd>
+      <dt>Sleep</dt><dd>{{ p.sleep_hours or '—' }} h</dd>
+      <dt>Water</dt><dd>{{ p.water_intake_l or '—' }} L/day</dd>
+      <dt>Stress</dt><dd>{{ p.stress_level or '—' }}</dd>
+      <dt>Smoking</dt><dd>{{ p.smoking or '—' }}</dd>
+      <dt>Alcohol</dt><dd>{{ p.alcohol or '—' }}</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="card"><h2>Medical history</h2>{% set p = twin.profile %}
+  <dl class="kv">
+    <dt>Conditions</dt><dd>{{ ([('Diabetes',p.hist_diabetes),('Hypertension',p.hist_hypertension),('Heart disease',p.hist_heart_disease),('Kidney disease',p.hist_kidney_disease),('Asthma',p.hist_asthma),('Thyroid',p.hist_thyroid)]|selectattr(1)|map(attribute=0)|list)|join(', ') or 'None reported' }}</dd>
+    <dt>Family history</dt><dd>{{ ([('Diabetes',p.fam_diabetes),('Heart disease',p.fam_heart_disease),('Stroke',p.fam_stroke),('Cancer',p.fam_cancer),('Kidney disease',p.fam_kidney_disease)]|selectattr(1)|map(attribute=0)|list)|join(', ') or 'None reported' }}</dd>
+    <dt>Allergies</dt><dd>{{ p.allergies or '—' }}</dd>
+    <dt>Medications</dt><dd>{{ p.current_medications or '—' }}</dd>
+  </dl>
+</div>
+{% endif %}
+{% endblock %}

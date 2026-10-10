@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Alerts — LifeTwin AI{% endblock %}
+{% block content %}
+{% include "_family_header.html" %}
+{% if active %}<div class="alert-box">🚨 Active emergency threshold — {{ patient_name }}<ul>{% for a in active %}<li>{{ a }}</li>{% endfor %}</ul></div>
+{% else %}<div class="card"><p>✅ No active emergency alerts.</p></div>{% endif %}
+<div class="card"><h2>Alert history</h2>
+  {% for e in events %}<div class="card emergency-card" style="margin-bottom:10px;"><b>{{ e.created_at.strftime('%d %b %Y, %H:%M') }}</b>
+    <ul>{% for l in e.lines %}<li>{{ l }}</li>{% endfor %}</ul></div>
+  {% else %}<p class="empty">No emergency alerts recorded.</p>{% endfor %}</div>
+<div class="safety-note">Automated threshold alerts — not a diagnosis. They do not replace a doctor or emergency services; LifeTwin AI does not contact emergency services.</div>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Find a Doctor — LifeTwin AI{% endblock %}
+{% block content %}
+{% if mine %}
+<div class="card">
+  <h2>My doctors</h2>
+  {% for c in mine %}
+  <div class="doc-card">
+    <div><h3>Dr. {{ c.doctor.user.full_name }}</h3>
+      <div class="muted small">{{ c.doctor.specialization }} · {{ c.doctor.hospital }}</div>
+      <span class="pill pill-{{ c.status|lower }}">{{ c.status }}</span></div>
+    <div class="row-actions">
+      {% if c.status == 'ACCEPTED' %}<a class="btn btn-sm" href="{{ url_for('pt.thread', doctor_id=c.doctor_id) }}">💬 Message</a>{% endif %}
+      <form method="POST" action="{{ url_for('pt.remove_connection', cid=c.id) }}" class="inline-form"
+            onsubmit="return confirm('{{ 'Cancel this request?' if c.status == 'PENDING' else 'Disconnect? This doctor will lose access to your health data.' }}');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-sm btn-outline" type="submit">{{ 'Cancel request' if c.status == 'PENDING' else 'Disconnect' }}</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Find a doctor</h2>
+  <form method="GET" style="display:flex; gap:8px; flex-wrap:wrap;">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search by name, Doctor ID, specialization or hospital (e.g. Cardiologist)" style="flex:1; min-width:240px;">
+    <button class="btn btn-sm" type="submit" style="margin-top:0;">Search</button>
+  </form>
+  <p class="muted small">Only doctors whose account status is VERIFIED are listed. This is an application-level status, not an external licence check.</p>
+  {% for d in results %}{% set c = conns.get(d.id) %}
+  <div class="doc-card">
+    <div>
+      <h3>Dr. {{ d.user.full_name }}</h3>
+      <div>{{ d.specialization }} · {{ d.hospital }}</div>
+      <div class="muted small">{{ d.qualification }} · Experience: {{ d.experience_years }} years · {{ d.doctor_code }}</div>
+    </div>
+    <div class="row-actions">
+      <a class="btn btn-sm btn-outline" href="{{ url_for('pt.doctor_profile', doctor_id=d.id) }}">View Profile</a>
+      {% if c and c.status == 'ACCEPTED' %}<span class="pill pill-accepted">Connected</span>
+      {% elif c and c.status == 'PENDING' %}<span class="pill pill-pending">Request pending</span>
+      {% elif c and c.status == 'BLOCKED' %}<span class="muted small">Unavailable</span>
+      {% else %}
+      <form method="POST" action="{{ url_for('pt.request_connection', doctor_id=d.id) }}" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-sm" type="submit">Request Connection</button>
+      </form>{% endif %}
+    </div>
+  </div>
+  {% else %}<p class="empty">{% if q %}No verified doctors match “{{ q }}”.{% else %}No verified doctors are available yet.{% endif %}</p>{% endfor %}
+</div>
+{% endblock %}

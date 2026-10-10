@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Family Access — LifeTwin AI{% endblock %}
+{% block content %}
+<h1>Family access</h1>
+<p class="muted">Add trusted family members and choose exactly what each person can see. They get their own login and never see your account.</p>
+
+{% for l in links %}
+<div class="card">
+  <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+    <div><h3 style="margin:0;">{{ l.member_user.full_name }} <span class="muted">— {{ l.relationship_label }}</span></h3>
+      <div class="muted small">{{ l.member_user.email }}{% if l.member_user.phone %} · {{ l.member_user.phone }}{% endif %}</div></div>
+    <form method="POST" action="{{ url_for('pt.family_remove', fm_id=l.id) }}" class="inline-form"
+          onsubmit="return confirm('Remove this family member? They will immediately lose all access.');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-danger" type="submit">Remove</button>
+    </form>
+  </div>
+  <form method="POST" action="{{ url_for('pt.family_permissions', fm_id=l.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="perm-grid">
+      {% for key, label, help in fields %}
+      <label><input type="checkbox" name="{{ key }}" {{ 'checked' if (l.permission|attr(key)) }}>
+        <span>{{ label }}<small>{{ help }}</small></span></label>
+      {% endfor %}
+    </div>
+    <button class="btn btn-sm btn-outline" type="submit">Save permissions</button>
+  </form>
+</div>
+{% else %}
+<div class="card"><p class="empty">No family members added yet.</p></div>
+{% endfor %}
+
+<div class="card">
+  <h2>Add a family member</h2>
+  <form method="POST" action="{{ url_for('pt.family_add') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="grid grid-2">
+      <div><label>Full name</label><input type="text" name="full_name" required></div>
+      <div><label>Relationship</label><input type="text" name="relationship" placeholder="Father, Mother, Brother…" required></div>
+      <div><label>Email (their login)</label><input type="email" name="email" required></div>
+      <div><label>Phone (optional)</label><input type="text" name="phone"></div>
+    </div>
+    <label>Initial password for their login (min 8 characters — share it privately; not needed if they already have a family login)</label>
+    <input type="password" name="password" minlength="8" autocomplete="new-password">
+    <label>What can they see?</label>
+    <div class="perm-grid">
+      {% for key, label, help in fields %}
+      <label><input type="checkbox" name="{{ key }}" {{ 'checked' if key in default_on }}><span>{{ label }}<small>{{ help }}</small></span></label>
+      {% endfor %}
+    </div>
+    <button class="btn" type="submit">Add family member</button>
+  </form>
+  <p class="muted small">Family members log in at <b>/family/login</b>. Permissions are enforced on the server and take effect immediately.</p>
+</div>
+{% endblock %}

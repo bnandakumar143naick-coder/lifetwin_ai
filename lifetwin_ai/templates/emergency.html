@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Emergency — LifeTwin AI{% endblock %}
+{% block content %}
+<h1>🚨 Emergency alerts</h1>
+{% if current_alerts %}
+<div class="alert-box">Your latest vitals are beyond an emergency threshold — consider seeking medical care now.
+  <ul>{% for a in current_alerts %}<li>{{ a }}</li>{% endfor %}</ul></div>
+{% else %}
+<div class="card"><p>✅ Your latest recorded vitals do not currently trip any emergency threshold.</p></div>
+{% endif %}
+<div class="safety-note">Alerts are automated threshold checks, not a diagnosis. LifeTwin AI does <b>not</b> contact emergency services. In an emergency call your local emergency number (India: 112).</div>
+
+<div class="grid grid-2">
+  <div class="card"><h3>Doctors who receive alerts</h3>
+    {% if doctors %}<ul>{% for d in doctors %}<li>Dr. {{ d.user.full_name }} — {{ d.specialization }}</li>{% endfor %}</ul>
+    {% else %}<p class="muted">None. <a href="{{ url_for('pt.doctors') }}">Find a doctor →</a></p>{% endif %}</div>
+  <div class="card"><h3>Family who receive alerts</h3>
+    {% if family %}<ul>{% for f in family %}<li>{{ f.member_user.full_name }} ({{ f.relationship_label }})</li>{% endfor %}</ul>
+    {% else %}<p class="muted">None. <a href="{{ url_for('pt.family_manage') }}">Manage family access →</a></p>{% endif %}</div>
+</div>
+
+<div class="card"><h3>Alert history</h3>
+  {% for e in events %}
+  <div class="card emergency-card" style="margin-bottom:10px;">
+    <b>{{ e.created_at.strftime('%d %b %Y, %H:%M') }}</b>
+    <ul>{% for l in e.lines %}<li>{{ l }}</li>{% endfor %}</ul>
+    <div class="small muted">{{ e.notified_summary }}</div>
+  </div>
+  {% else %}<p class="empty">No emergency alerts recorded.</p>{% endfor %}
+</div>
+{% endblock %}

@@ -5,51 +5,72 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}LifeTwin AI{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 </head>
 <body>
-<header class="navbar">
-    <div class="navbar-inner">
-        <a href="{{ url_for('home') }}" class="brand">
-            <span class="brand-icon">🫀</span> LifeTwin <span class="brand-accent">AI</span>
-        </a>
-        <nav class="nav-links">
-            {% if session.user_id %}
-                <a href="{{ url_for('dashboard') }}">Dashboard</a>
-                <a href="{{ url_for('profile') }}">Profile</a>
-                <a href="{{ url_for('data_entry') }}">Vitals</a>
-                <a href="{{ url_for('lab_reports') }}">Lab Reports</a>
-                <a href="{{ url_for('symptoms') }}">Symptoms</a>
-                <a href="{{ url_for('coach') }}">AI Coach</a>
-                <a href="{{ url_for('logout') }}" class="nav-btn-outline">Logout</a>
-            {% else %}
-                <a href="{{ url_for('login') }}">Login</a>
-                <a href="{{ url_for('register') }}" class="nav-btn">Get Started</a>
-            {% endif %}
-        </nav>
-    </div>
-</header>
+<nav class="navbar">
+  <a class="brand" href="{{ url_for('index') }}">🩺 LifeTwin <span>AI</span></a>
+  <div class="nav-links">
+    {% if current_user.is_authenticated %}
+      {% if nav_role == 'DOCTOR' %}
+        <a href="{{ url_for('doctor.dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('doctor.patients') }}">My Patients</a>
+        <a href="{{ url_for('doctor.requests_page') }}">Requests</a>
+        <a href="{{ url_for('doctor.messages_index') }}">Messages{% if unread_messages %}<span class="badge">{{ unread_messages }}</span>{% endif %}</a>
+        <a href="{{ url_for('doctor.records') }}">Health Records</a>
+        <a href="{{ url_for('doctor.alerts') }}">Alerts</a>
+        <a href="{{ url_for('doctor.profile') }}">Profile</a>
+      {% elif nav_role == 'FAMILY' %}
+        <a href="{{ url_for('family.dashboard', fm=fam_fm) }}">Dashboard</a>
+        <a href="{{ url_for('family.health', fm=fam_fm) }}">Patient Health</a>
+        <a href="{{ url_for('family.vitals', fm=fam_fm) }}">Vitals</a>
+        <a href="{{ url_for('family.updates', fm=fam_fm) }}">Health Updates</a>
+        <a href="{{ url_for('family.alerts', fm=fam_fm) }}">Alerts</a>
+        <a href="{{ url_for('common.account') }}">Profile</a>
+      {% else %}
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('edit_profile') }}">Health Profile</a>
+        <a href="{{ url_for('data_entry') }}">Vitals</a>
+        <a href="{{ url_for('labs') }}">Labs</a>
+        <a href="{{ url_for('symptoms') }}">Symptoms</a>
+        <a href="{{ url_for('dashboard') }}#health-score">Health Score</a>
+        <a href="{{ url_for('dashboard') }}#risk-analysis">Risk Analysis</a>
+        <a href="{{ url_for('dashboard') }}#plans">Plans</a>
+        <a href="{{ url_for('coach') }}">AI Coach</a>
+        <a href="{{ url_for('pt.doctors') }}">Doctors</a>
+        <a href="{{ url_for('pt.messages_index') }}">Messages{% if unread_messages %}<span class="badge">{{ unread_messages }}</span>{% endif %}</a>
+        <a href="{{ url_for('pt.family_manage') }}">Family</a>
+        <a href="{{ url_for('download_report') }}">Reports</a>
+        <a href="{{ url_for('pt.emergency') }}">Emergency</a>
+        <a href="{{ url_for('common.account') }}">Profile</a>
+      {% endif %}
+      <a href="{{ url_for('common.notifications') }}" title="Notifications">🔔{% if unread_notifications %}<span class="badge">{{ unread_notifications }}</span>{% endif %}</a>
+      <a href="{{ url_for('logout') }}" class="logout">Logout</a>
+    {% else %}
+      <a href="{{ url_for('login') }}">Login</a>
+      <a href="{{ url_for('eco_auth.doctor_login') }}">Doctor Portal</a>
+      <a href="{{ url_for('register') }}" class="cta">Get Started</a>
+    {% endif %}
+  </div>
+</nav>
 
 <main class="container">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="flash-wrap">
-            {% for category, message in messages %}
-                <div class="flash flash-{{ category }}">{{ message }}</div>
-            {% endfor %}
-            </div>
-        {% endif %}
-    {% endwith %}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-wrap">
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
 
-    {% block content %}{% endblock %}
+  {% block content %}{% endblock %}
 </main>
 
-<footer class="site-footer">
-    <p>LifeTwin AI — Building a Digital Health Twin that predicts future health risks before they become diseases.</p>
-    <p class="disclaimer">Disclaimer: LifeTwin AI provides general wellness insights based on self-reported data and is not a substitute for professional medical advice.</p>
+<footer>
+  <p>LifeTwin AI — Building a Digital Health Twin that predicts future health risks before they become diseases.</p>
+  <p class="disclaimer">This platform provides AI-generated wellness insights for preventive awareness only and is not a substitute for professional medical advice.</p>
 </footer>
-
-{% block scripts %}{% endblock %}
 </body>
 </html>

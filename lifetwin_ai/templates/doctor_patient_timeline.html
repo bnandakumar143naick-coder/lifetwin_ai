@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ patient.full_name }} — Health Timeline{% endblock %}
+{% block content %}
+<h1>Health timeline</h1>
+<p class="muted">{{ patient.full_name }} · Age {{ patient.age }}</p>
+{% include "_patient_tabs.html" %}
+<div class="grid grid-2">
+  <div class="card" style="grid-column:1/-1;">
+    <ul class="timeline">
+      {% for e in events %}
+      <li><div class="when">{{ e.when.strftime('%d %b %Y, %H:%M') }}</div>
+        <div class="ttl">{{ e.icon }} {{ e.title }}</div><div class="small">{{ e.detail }}</div></li>
+      {% else %}<li class="empty">No events yet.</li>{% endfor %}
+    </ul>
+  </div>
+</div>
+{% if labs_with_files %}
+<div class="card"><h3>Uploaded lab documents</h3>
+  <ul>{% for l in labs_with_files %}
+    <li><a href="{{ url_for('doctor.patient_lab_file', pid=patient.id, lab_id=l.id) }}">Lab report — {{ l.recorded_at.strftime('%d %b %Y') }}</a></li>{% endfor %}
+  </ul></div>
+{% endif %}
+{% endblock %}

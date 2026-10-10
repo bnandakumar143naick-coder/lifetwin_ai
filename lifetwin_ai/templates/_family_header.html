@@ -1,0 +1,5 @@
+<div class="portal-banner"><h1>FAMILY HEALTH VIEW</h1>
+  <p>Patient: <b>{{ fm.patient.full_name }}</b> · You are: {{ fm.relationship_label }} (shared access — only what the patient allowed)</p></div>
+{% if links|length > 1 %}
+<div class="subnav">{% for l in links %}<a class="{{ 'active' if l.id == fm.id }}" href="{{ request.path }}?fm={{ l.id }}">{{ l.patient.full_name }}</a>{% endfor %}</div>
+{% endif %}

@@ -2,181 +2,150 @@
 {% block title %}Dashboard — LifeTwin AI{% endblock %}
 {% block content %}
 
-<div class="page-header">
-    <h1>Hello, {{ user.full_name.split(' ')[0] }} 👋</h1>
-    <p>Here's the current state of your Digital Health Twin.</p>
-</div>
-
-{% if alerts %}
+{% if emergency_alerts %}
 <div class="alert-box">
-    🚨 Emergency Health Alert — please seek medical attention
-    <ul>
-        {% for a in alerts %}<li>{{ a }}</li>{% endfor %}
-    </ul>
+  🚨 High Risk Alert — Immediate attention recommended
+  <ul>
+    {% for a in emergency_alerts %}<li>{{ a }}</li>{% endfor %}
+  </ul>
 </div>
 {% endif %}
 
-<div class="overall-score-block">
-    <div class="score-ring" style="font-size:0.9rem;">
-        <div class="label">Overall Health Score</div>
-        <div class="overall-score-num">{{ scores.overall }}<span style="font-size:1.2rem;">/100</span></div>
-        <div>BMI: {{ scores.bmi or '—' }} ({{ scores.bmi_category }})</div>
+<h1>Hi {{ current_user.full_name.split(' ')[0] }}, here's your Digital Health Twin</h1>
+
+<div class="card" id="health-score">
+  <h2>Overall Health Score</h2>
+  <div class="grid grid-3">
+    <div class="score-card">
+      <div class="score-circle" style="--pct:{{ scores.overall }}">
+        <div class="inner">{{ scores.overall }}</div>
+      </div>
+      <h4>Overall</h4>
     </div>
-    <div style="flex:1;">
-        <a href="{{ url_for('download_report') }}" class="btn" style="background:#fff;color:var(--teal-dark);">⬇ Download PDF Health Report</a>
+    {% for label, key in [("Fitness","fitness"),("Nutrition","nutrition"),("Sleep","sleep"),("Hydration","hydration"),("Mental Wellness","mental")] %}
+    <div class="score-card">
+      <div class="score-circle" style="--pct:{{ scores[key].score }}">
+        <div class="inner">{{ scores[key].score }}</div>
+      </div>
+      <h4>{{ label }}</h4>
+      {% if scores[key].reasons %}
+      <ul class="score-reasons">
+        {% for r in scores[key].reasons[:2] %}<li>{{ r }}</li>{% endfor %}
+      </ul>
+      {% endif %}
     </div>
+    {% endfor %}
+  </div>
 </div>
 
 <div class="card">
-    <h3>Health Scores</h3>
-    <div class="score-ring-grid">
-        {% for label, key in [('Physical','physical'),('Nutrition','nutrition'),('Sleep','sleep'),('Hydration','hydration'),('Mental','mental')] %}
-        <div class="score-item">
-            <div class="score-value">{{ scores[key] }}</div>
-            <div class="score-label">{{ label }}</div>
-            <div class="score-bar-track"><div class="score-bar-fill" style="width:{{ scores[key] }}%;"></div></div>
-        </div>
-        {% endfor %}
-    </div>
+  <h2>Monthly Progress</h2>
+  <canvas id="progressChart" height="90"></canvas>
 </div>
 
-<div class="dash-grid">
-    <div>
-        <div class="card">
-            <h3>Future Disease Risk Prediction</h3>
-            {% for disease, v in disease_risks.items() %}
-            <div class="disease-bar-row">
-                <div class="top">
-                    <span><strong>{{ disease }}</strong></span>
-                    <span>{{ v.current_risk }}% now → {{ v.future_risk }}% in 5 yrs</span>
-                </div>
-                <div class="disease-track">
-                    <div class="disease-fill-current" style="width:{{ v.current_risk }}%;"></div>
-                    <div class="disease-fill-future" style="width:{{ v.future_risk }}%;"></div>
-                </div>
-                <div class="disease-reasons">{{ v.reasons | join(', ') }}</div>
-            </div>
-            {% endfor %}
-        </div>
+<div class="grid grid-2">
+  <div class="card">
+    <h2>Symptom Analysis</h2>
+    {% if symptom_result.possible_conditions %}
+      <p>Risk Level:
+        <span class="risk-badge risk-{{ symptom_result.risk_level|lower }}">{{ symptom_result.risk_level }}</span>
+      </p>
+      <p><b>Possible related conditions</b> (not a diagnosis): {{ symptom_result.possible_conditions|join(', ') }}</p>
+      <ul>{% for a in symptom_result.advice %}<li>{{ a }}</li>{% endfor %}</ul>
+    {% else %}
+      <p>No symptoms currently logged. <a href="{{ url_for('symptoms') }}">Log symptoms →</a></p>
+    {% endif %}
+  </div>
 
-        <div class="card">
-            <h3>Symptom Analysis</h3>
-            {% if symptom_results %}
-                {% for s in symptom_results %}
-                <div style="margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid var(--line);">
-                    <div class="card-row" style="margin-bottom:4px;">
-                        <strong>{{ s.symptom }}</strong>
-                        <span class="badge badge-{{ s.risk_level|lower }}">{{ s.risk_level }} Risk</span>
-                    </div>
-                    <div style="font-size:0.88rem; color:var(--muted);">Possible: {{ s.possible_conditions | join(', ') }}</div>
-                    <div style="font-size:0.88rem; margin-top:4px;">{{ s.advice }}</div>
-                </div>
-                {% endfor %}
-            {% else %}
-                <div class="empty-state">No current symptoms logged. <a href="{{ url_for('symptoms') }}">Log symptoms →</a></div>
-            {% endif %}
-        </div>
-
-        <div class="card">
-            <h3>Personalized Prevention Plan</h3>
-            <div class="plan-columns">
-                <div class="plan-col">
-                    <h4>🥗 Diet Plan</h4>
-                    <p><strong>Breakfast:</strong></p>
-                    <ul>{% for item in plan.diet.breakfast %}<li>{{ item }}</li>{% endfor %}</ul>
-                    <p><strong>Lunch:</strong></p>
-                    <ul>{% for item in plan.diet.lunch %}<li>{{ item }}</li>{% endfor %}</ul>
-                    <p><strong>Dinner:</strong></p>
-                    <ul>{% for item in plan.diet.dinner %}<li>{{ item }}</li>{% endfor %}</ul>
-                    <p><strong>Water Target:</strong> {{ plan.diet.water_target_l }} L/day</p>
-                    <p><strong>Avoid:</strong> {{ plan.diet.foods_to_avoid | join(', ') }}</p>
-                </div>
-                <div class="plan-col">
-                    <h4>🏃 Exercise Plan ({{ plan.exercise.level }})</h4>
-                    <table class="week-table">
-                        {% for day, activity in plan.exercise.weekly_schedule.items() %}
-                        <tr><td>{{ day }}</td><td>{{ activity }}</td></tr>
-                        {% endfor %}
-                    </table>
-                </div>
-                <div class="plan-col">
-                    <h4>🧘 Lifestyle Plan</h4>
-                    <p>{{ plan.lifestyle.sleep_schedule }}</p>
-                    <p>{{ plan.lifestyle.stress_management }}</p>
-                    <p>{{ plan.lifestyle.weight_management }}</p>
-                    <ul>{% for g in plan.lifestyle.daily_goals %}<li>{{ g }}</li>{% endfor %}</ul>
-                </div>
-                <div class="plan-col">
-                    <h4>🛡 Preventive Care</h4>
-                    <ul>
-                        <li>{{ plan.preventive_care.checkup_reminder }}</li>
-                        <li>{{ plan.preventive_care.medication_reminder }}</li>
-                        <li>{{ plan.preventive_care.vaccination_reminder }}</li>
-                        {% if plan.preventive_care.priority_screenings %}
-                            {% for s in plan.preventive_care.priority_screenings %}<li>{{ s }}</li>{% endfor %}
-                        {% endif %}
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div>
-        <div class="card">
-            <h3>Monthly Progress</h3>
-            <canvas id="scoreChart" height="200"></canvas>
-        </div>
-        <div class="card">
-            <h3>Vitals Trend</h3>
-            <canvas id="vitalsChart" height="200"></canvas>
-        </div>
-        <div class="card">
-            <h3>Quick Actions</h3>
-            <p><a href="{{ url_for('data_entry') }}" class="btn btn-secondary btn-block" style="margin-bottom:8px;">➕ Log Vitals</a></p>
-            <p><a href="{{ url_for('symptoms') }}" class="btn btn-secondary btn-block" style="margin-bottom:8px;">🩺 Update Symptoms</a></p>
-            <p><a href="{{ url_for('lab_reports') }}" class="btn btn-secondary btn-block" style="margin-bottom:8px;">🧪 Add Lab Report</a></p>
-            <p><a href="{{ url_for('coach') }}" class="btn btn-secondary btn-block">💬 Ask AI Health Coach</a></p>
-        </div>
-    </div>
+  <div class="card">
+    <h2>Latest Vitals</h2>
+    {% if vitals %}
+    <table>
+      <tr><td>Blood Pressure</td><td>{{ vitals.systolic_bp or '-' }}/{{ vitals.diastolic_bp or '-' }} mmHg</td></tr>
+      <tr><td>Blood Sugar</td><td>{{ vitals.blood_sugar or '-' }} mg/dL</td></tr>
+      <tr><td>Heart Rate</td><td>{{ vitals.heart_rate or '-' }} bpm</td></tr>
+      <tr><td>Oxygen Saturation</td><td>{{ vitals.oxygen_saturation or '-' }} %</td></tr>
+      <tr><td>Body Temperature</td><td>{{ vitals.body_temperature or '-' }} °C</td></tr>
+    </table>
+    {% else %}
+      <p>No vitals recorded yet. <a href="{{ url_for('data_entry') }}">Add data →</a></p>
+    {% endif %}
+  </div>
 </div>
 
-{% endblock %}
+<div class="card" id="risk-analysis">
+  <h2>Future Disease Risk Prediction</h2>
+  <table>
+    <tr><th>Disease</th><th>Current Risk</th><th>Future Risk (~5 yrs)</th><th>Why</th></tr>
+    {% for disease, r in risks.items() %}
+    <tr>
+      <td>{{ disease }}</td>
+      <td>{{ r.current }}%</td>
+      <td>{{ r.future }}%</td>
+      <td style="font-size:.82rem; color:var(--muted);">{{ r.reasons[:2]|join('; ') if r.reasons else '—' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
 
-{% block scripts %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<div class="grid grid-2" id="plans">
+  <div class="card">
+    <h2>🥗 Personalized Diet Plan</h2>
+    <p><b>Breakfast:</b> {{ diet_plan.breakfast|join(', ') }}</p>
+    <p><b>Lunch:</b> {{ diet_plan.lunch|join(', ') }}</p>
+    <p><b>Dinner:</b> {{ diet_plan.dinner|join(', ') }}</p>
+    <p><b>Snacks:</b> {{ diet_plan.snacks|join(', ') }}</p>
+    <p><b>Water Target:</b> {{ diet_plan.water_target_l }} L/day</p>
+    <p><b>Foods to Avoid:</b> {{ diet_plan.avoid|join(', ') }}</p>
+  </div>
+
+  <div class="card">
+    <h2>🏃 Exercise Plan</h2>
+    <p>{{ exercise_plan.note }}</p>
+    <table>
+      {% for day, activity in exercise_plan.weekly_schedule.items() %}
+      <tr><td>{{ day }}</td><td>{{ activity }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <h2>🧘 Lifestyle Plan</h2>
+    <p><b>Sleep Schedule:</b> {{ lifestyle_plan.sleep_schedule }}</p>
+    <p><b>Stress Management:</b> {{ lifestyle_plan.stress_management }}</p>
+    <p><b>Daily Goals:</b></p>
+    <ul>{% for g in lifestyle_plan.daily_goals %}<li>{{ g }}</li>{% endfor %}</ul>
+  </div>
+
+  <div class="card">
+    <h2>🛡️ Preventive Care Reminders</h2>
+    <ul>{% for p in preventive_care %}<li>{{ p }}</li>{% endfor %}</ul>
+  </div>
+</div>
+
+<div class="card" style="text-align:center;">
+  <h2>Download Your Full Health Report</h2>
+  <p>Get a complete PDF with your health summary, scores, risks, and plans — great for sharing with a doctor or family.</p>
+  <a href="{{ url_for('download_report') }}" class="btn">⬇ Download PDF Report</a>
+  <a href="{{ url_for('coach') }}" class="btn btn-outline">💬 Ask AI Health Coach</a>
+</div>
+
 <script>
-const scoreHistory = {{ score_history | tojson }};
-const vitalsHistory = {{ vitals_history | tojson }};
-
-const scoreLabels = scoreHistory.map(r => r.computed_at.slice(5, 16));
-new Chart(document.getElementById('scoreChart'), {
-    type: 'line',
-    data: {
-        labels: scoreLabels,
-        datasets: [{
-            label: 'Overall Health Score',
-            data: scoreHistory.map(r => r.overall),
-            borderColor: '#0f6e5b',
-            backgroundColor: 'rgba(15,110,91,0.12)',
-            tension: 0.3,
-            fill: true,
-        }]
-    },
-    options: { plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100 } } }
-});
-
-const vitalsLabels = vitalsHistory.map(r => r.recorded_at.slice(5, 16));
-new Chart(document.getElementById('vitalsChart'), {
-    type: 'line',
-    data: {
-        labels: vitalsLabels,
-        datasets: [
-            { label: 'Systolic BP', data: vitalsHistory.map(r => r.systolic), borderColor: '#d97757', tension: 0.3 },
-            { label: 'Blood Sugar', data: vitalsHistory.map(r => r.blood_sugar), borderColor: '#c98a2c', tension: 0.3 },
-            { label: 'Heart Rate', data: vitalsHistory.map(r => r.heart_rate), borderColor: '#0f6e5b', tension: 0.3 },
-        ]
-    },
-    options: { plugins: { legend: { position: 'bottom' } } }
+const ctx = document.getElementById('progressChart');
+const history = {{ history|tojson }};
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: history.map((h, i) => 'Check-in ' + (i + 1)),
+    datasets: [
+      {label: 'Overall', data: history.map(h => h.overall_score), borderColor: '#0f766e', tension: 0.3},
+      {label: 'Fitness', data: history.map(h => h.fitness_score), borderColor: '#14b8a6', tension: 0.3},
+      {label: 'Sleep', data: history.map(h => h.sleep_score), borderColor: '#f59e0b', tension: 0.3},
+    ]
+  },
+  options: { scales: { y: { min: 0, max: 100 } }, plugins: { legend: { position: 'bottom' } } }
 });
 </script>
 {% endblock %}

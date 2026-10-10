@@ -1,20 +1,17 @@
 {% extends "base.html" %}
-{% block title %}Log in — LifeTwin AI{% endblock %}
+{% block title %}Login — LifeTwin AI{% endblock %}
 {% block content %}
-<div class="auth-wrap">
-    <h2>Welcome back</h2>
-    <p class="auth-sub">Log in to see your latest health insights.</p>
-    <form method="POST">
-        <div class="field">
-            <label for="email">Email</label>
-            <input type="email" id="email" name="email" required autofocus>
-        </div>
-        <div class="field">
-            <label for="password">Password</label>
-            <input type="password" id="password" name="password" required>
-        </div>
-        <button type="submit" class="btn btn-primary btn-block">Log In</button>
-    </form>
-    <p class="auth-switch">New to LifeTwin AI? <a href="{{ url_for('register') }}">Create an account</a></p>
+<div class="card" style="max-width:420px; margin:0 auto;">
+  <h2>Welcome back</h2>
+  <form method="POST">
+    <label>Email</label>
+    <input type="email" name="email" required>
+    <label>Password</label>
+    <input type="password" name="password" required>
+    <button class="btn" type="submit">Login</button>
+  </form>
+  <p style="margin-top:14px;">New here? <a href="{{ url_for('register') }}">Create an account</a></p>
+  <p class="muted small" style="margin-top:8px;">Doctor? <a href="{{ url_for('eco_auth.doctor_login') }}">Doctor portal</a> ·
+     Family member? <a href="{{ url_for('eco_auth.family_login') }}">Family login</a></p>
 </div>
 {% endblock %}

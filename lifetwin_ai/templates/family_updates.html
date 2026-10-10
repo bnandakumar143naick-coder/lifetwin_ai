@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Health Updates — LifeTwin AI{% endblock %}
+{% block content %}
+{% include "_family_header.html" %}
+<div class="card"><h2>Health updates</h2>
+  <p class="muted small">Only updates of the types the patient has shared with you are listed.</p>
+  <ul class="timeline">
+    {% for e in events %}<li><div class="when">{{ e.when.strftime('%d %b %Y, %H:%M') }}</div><div class="ttl">{{ e.icon }} {{ e.title }}</div><div class="small">{{ e.detail }}</div></li>
+    {% else %}<li class="empty">No updates to show.</li>{% endfor %}
+  </ul></div>
+{% endblock %}

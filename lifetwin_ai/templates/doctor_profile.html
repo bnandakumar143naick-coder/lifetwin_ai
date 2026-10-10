@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Doctor Profile — LifeTwin AI{% endblock %}
+{% block content %}
+<div class="card" style="max-width:640px; margin:0 auto;">
+  <h2>My professional profile</h2>
+  <dl class="kv">
+    <dt>Doctor ID</dt><dd>{{ doctor.doctor_code }}</dd>
+    <dt>Name</dt><dd>Dr. {{ current_user.full_name }}</dd>
+    <dt>Email</dt><dd>{{ current_user.email }}</dd>
+    <dt>Licence no.</dt><dd>{{ doctor.license_number }} <span class="muted small">(contact an administrator to change)</span></dd>
+    <dt>Verification</dt><dd><span class="pill pill-{{ doctor.verification_status|lower }}">{{ doctor.verification_status }}</span>
+      <span class="muted small">application-level status</span></dd>
+  </dl>
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Specialization</label><input type="text" name="specialization" value="{{ doctor.specialization }}" required>
+    <label>Qualification</label><input type="text" name="qualification" value="{{ doctor.qualification }}" required>
+    <label>Hospital / Clinic</label><input type="text" name="hospital" value="{{ doctor.hospital }}" required>
+    <label>Years of experience</label><input type="number" name="experience_years" min="0" max="70" value="{{ doctor.experience_years }}" required>
+    <label>About (shown to patients)</label><textarea name="bio" maxlength="1000">{{ doctor.bio or '' }}</textarea>
+    <button class="btn" type="submit">Save profile</button>
+  </form>
+  <p class="muted small" style="margin-top:14px;">Phone and password: <a href="{{ url_for('common.account') }}">Account settings</a></p>
+</div>
+{% endblock %}

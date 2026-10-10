@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Vitals — LifeTwin AI{% endblock %}
+{% block content %}
+{% include "_family_header.html" %}
+<div class="card"><h2>Latest vitals</h2>
+  {% if latest %}<dl class="kv"><dt>Blood pressure</dt><dd>{{ latest.systolic_bp or '-' }}/{{ latest.diastolic_bp or '-' }} mmHg</dd>
+    <dt>Heart rate</dt><dd>{{ latest.heart_rate or '-' }} bpm</dd><dt>SpO2</dt><dd>{{ latest.oxygen_saturation or '-' }} %</dd></dl>
+    <p class="muted small">{{ latest.recorded_at.strftime('%d %b %Y, %H:%M') }}</p>{% else %}<p class="empty">No vitals recorded.</p>{% endif %}</div>
+<div class="grid grid-2">
+  <div class="card"><h3>Blood pressure</h3><canvas id="fBP" height="150"></canvas></div>
+  <div class="card"><h3>Heart rate &amp; SpO2</h3><canvas id="fHR" height="150"></canvas></div>
+</div>
+<script>
+const D = {{ data|tojson }}; const L = D.map(v=>v.t);
+new Chart(document.getElementById('fBP'), {type:'line', data:{labels:L, datasets:[{label:'Systolic',data:D.map(v=>v.sys),borderColor:'#dc2626',tension:.3},{label:'Diastolic',data:D.map(v=>v.dia),borderColor:'#0f766e',tension:.3}]}, options:{spanGaps:true, plugins:{legend:{position:'bottom'}}}});
+new Chart(document.getElementById('fHR'), {type:'line', data:{labels:L, datasets:[{label:'Heart rate',data:D.map(v=>v.hr),borderColor:'#f59e0b',tension:.3},{label:'SpO2',data:D.map(v=>v.spo2),borderColor:'#2563eb',tension:.3}]}, options:{spanGaps:true, plugins:{legend:{position:'bottom'}}}});
+</script>
+{% endblock %}

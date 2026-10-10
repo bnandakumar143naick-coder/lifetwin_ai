@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Patient Health — LifeTwin AI{% endblock %}
+{% block content %}
+{% include "_family_header.html" %}
+{% if view.get('scores') %}
+<div class="card"><h2>Health score</h2>
+  <div class="grid grid-3">
+    <div class="score-card"><div class="score-circle" style="--pct:{{ view.scores.overall }}"><div class="inner">{{ view.scores.overall }}</div></div><h4>Overall</h4></div>
+    {% for label, key in [("Fitness","fitness"),("Nutrition","nutrition"),("Sleep","sleep"),("Hydration","hydration"),("Mental Wellness","mental")] %}
+    <div class="score-card"><div class="score-circle" style="--pct:{{ view.scores[key].score }}"><div class="inner">{{ view.scores[key].score }}</div></div><h4>{{ label }}</h4></div>{% endfor %}
+  </div></div>
+{% endif %}
+{% if view.get('labs') %}
+<div class="card"><h2>Laboratory results</h2>
+  <table>{% for k, v in view.labs.items() if k != '_when' %}<tr><td>{{ k }}</td><td>{{ v if v is not none else '-' }}</td></tr>{% endfor %}</table>
+  <p class="muted small">Recorded {{ view.labs._when.strftime('%d %b %Y') }}</p></div>
+{% endif %}
+{% if view.get('history') %}{% set h = view.history %}
+<div class="card"><h2>Medical history</h2>
+  <dl class="kv"><dt>Conditions</dt><dd>{{ h.conditions|join(', ') or 'None reported' }}</dd>
+    <dt>Family history</dt><dd>{{ h.family|join(', ') or 'None reported' }}</dd>
+    <dt>Allergies</dt><dd>{{ h.allergies or '—' }}</dd><dt>Medications</dt><dd>{{ h.medications or '—' }}</dd></dl></div>
+{% endif %}
+{% if perm.view_symptoms %}
+<div class="card"><h2>Symptoms</h2>
+  {% if view.get('symptoms') %}<p>{{ view.symptoms|join(', ') }}</p><p class="muted small">Logged {{ view.symptoms_when.strftime('%d %b %Y, %H:%M') }}</p>
+  {% else %}<p class="muted">No symptoms logged.</p>{% endif %}</div>
+{% endif %}
+{% if not (perm.view_health_score or perm.view_labs or perm.view_history or perm.view_symptoms) %}
+<div class="card"><p class="empty">The patient has not shared any of these sections with you.</p></div>{% endif %}
+{% include "_ai_disclaimer.html" %}
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Conversation — LifeTwin AI{% endblock %}
+{% block content %}
+<div class="chat-wrap">
+  <p><a href="{{ back_url }}">← All conversations</a></p>
+  <div class="card" style="padding:16px 22px; margin-bottom:12px;">
+    <h2 style="margin:0;">{{ other_name }}</h2><div class="muted small">{{ other_subtitle }}</div>
+  </div>
+
+  <div class="chat-box" id="chatBox">
+    {% for m in messages %}
+    <div class="msg {{ 'mine' if m.sender_user_id == current_user.id }}" data-id="{{ m.id }}">
+      <div class="meta">{{ m.sender.full_name }} · {{ m.created_at.strftime('%d %b %H:%M') }}
+        {% if m.sender_user_id == current_user.id %}<span class="rd">{{ '✓ Read' if m.is_read else 'Sent' }}</span>{% endif %}</div>
+      {% if m.message %}<div class="body">{{ m.message }}</div>{% endif %}
+      {% if m.attachment_stored_name %}<a class="att" href="{{ url_for('common.attachment_download', message_id=m.id) }}">📎 {{ m.attachment_original_name }}</a>{% endif %}
+    </div>
+    {% else %}<p class="empty" id="emptyNote">No messages yet. Say hello.</p>{% endfor %}
+  </div>
+
+  <form method="POST" action="{{ post_url }}" enctype="multipart/form-data" class="chat-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <textarea name="message" maxlength="2000" rows="2" placeholder="Type a message…"></textarea>
+    <div><input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.docx" style="max-width:200px;">
+      <div class="muted small">PDF, PNG, JPG, DOCX · max 5 MB</div></div>
+    <button class="btn btn-sm" type="submit">Send</button>
+  </form>
+  <div class="safety-note">Messages are stored in the LifeTwin database and shared only between you and this connected doctor/patient. Do not use chat for emergencies — contact local emergency services.
+    New messages appear by periodic refresh (every 10 s), not live push.</div>
+</div>
+
+<script>
+(function(){
+  const box = document.getElementById('chatBox');
+  let lastId = {{ last_id }};
+  box.scrollTop = box.scrollHeight;
+  function render(m){
+    const d = document.createElement('div'); d.className = 'msg' + (m.mine ? ' mine' : ''); d.dataset.id = m.id;
+    const meta = document.createElement('div'); meta.className = 'meta';
+    meta.textContent = m.sender + ' · ' + m.time + (m.mine ? ' ' : '');
+    if (m.mine){ const s = document.createElement('span'); s.className = 'rd'; s.textContent = m.is_read ? '✓ Read' : 'Sent'; meta.appendChild(s); }
+    d.appendChild(meta);
+    if (m.message){ const b = document.createElement('div'); b.className = 'body'; b.textContent = m.message; d.appendChild(b); }
+    if (m.attachment){ const a = document.createElement('a'); a.className = 'att'; a.href = m.attachment.url; a.textContent = '📎 ' + m.attachment.name; d.appendChild(a); }
+    return d;
+  }
+  async function poll(){
+    try{
+      const r = await fetch('{{ url_for("common.api_messages", conv_id=conv.id) }}?after=' + lastId, {credentials:'same-origin'});
+      if(!r.ok) return;
+      const j = await r.json();
+      const note = document.getElementById('emptyNote'); if (note && j.messages.length) note.remove();
+      j.messages.forEach(m => { if(!box.querySelector('[data-id="'+m.id+'"]')){ box.appendChild(render(m)); } lastId = Math.max(lastId, m.id); });
+      if (j.messages.length) box.scrollTop = box.scrollHeight;
+      (j.my_read_ids||[]).forEach(id => { const el = box.querySelector('[data-id="'+id+'"] .rd'); if(el) el.textContent = '✓ Read'; });
+    }catch(e){}
+  }
+  setInterval(poll, 10000);
+})();
+</script>
+{% endblock %}

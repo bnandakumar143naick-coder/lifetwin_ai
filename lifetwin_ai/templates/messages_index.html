@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Messages — LifeTwin AI{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>💬 Messages</h2>
+  {% for r in rows %}
+  <div class="doc-card">
+    <div>
+      <h3>{{ r.name }}{% if r.unread %} <span class="badge">{{ r.unread }} new</span>{% endif %}</h3>
+      <div class="muted small">{{ r.subtitle }}</div>
+      <div class="small">{% if r.last %}{{ (r.last.message or '📎 ' ~ r.last.attachment_original_name)[:90] }}
+        <span class="muted">· {{ r.last.created_at.strftime('%d %b %H:%M') }}</span>{% else %}<span class="muted">No messages yet</span>{% endif %}</div>
+    </div>
+    <a class="btn btn-sm" href="{{ r.url }}">Open conversation</a>
+  </div>
+  {% else %}<p class="empty">{{ empty_text }}</p>{% endfor %}
+</div>
+{% endblock %}

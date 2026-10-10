@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Family Health View — LifeTwin AI{% endblock %}
+{% block content %}
+{% if not fm %}
+<div class="card" style="max-width:560px; margin:30px auto; text-align:center;">
+  <h2>No patient linked yet</h2><p class="muted">A patient must add you as a family member before you can see any health information.</p></div>
+{% else %}
+{% include "_family_header.html" %}
+{% if view.get('emergency_now') %}
+<div class="alert-box">🚨 EMERGENCY ALERT — {{ view.patient_name }}
+  <ul>{% for a in view.emergency_now %}<li>{{ a }}</li>{% endfor %}</ul>
+  <div style="font-weight:500; margin-top:6px;">An emergency threshold has been detected. This is an automated alert, not a diagnosis, and does not replace a doctor or emergency services.</div></div>
+{% endif %}
+<div class="grid grid-2">
+  {% if perm.view_health_score %}
+  <div class="card" style="text-align:center;"><h3>Health score</h3>
+    {% if view.get('score') is not none %}<div class="big-score">{{ view.score }} / 100</div>{% else %}<p class="muted">Not available yet.</p>{% endif %}</div>
+  {% endif %}
+  {% if perm.view_vitals %}
+  <div class="card"><h3>Latest vitals</h3>
+    {% if view.get('vitals') %}<dl class="kv"><dt>BP</dt><dd>{{ view.vitals.bp }}</dd><dt>Heart rate</dt><dd>{{ view.vitals.hr or '-' }}</dd><dt>SpO2</dt><dd>{{ view.vitals.spo2 or '-' }}{% if view.vitals.spo2 %}%{% endif %}</dd></dl>
+      <p class="muted small">{{ view.vitals.when.strftime('%d %b %Y, %H:%M') }}</p>{% else %}<p class="muted">No vitals recorded.</p>{% endif %}</div>
+  {% endif %}
+</div>
+<div class="card"><h3>Latest update</h3>
+  {% if view.latest_update %}<p>{{ view.latest_update.icon }} {{ view.latest_update.title }} — {{ view.latest_update.detail }}
+    <span class="muted small">({{ view.latest_update.when.strftime('%d %b %Y, %H:%M') }})</span></p>
+  {% else %}<p class="muted">No updates you are permitted to see yet.</p>{% endif %}</div>
+{% if perm.view_doctor_conversations %}
+<div class="card"><h3>Doctor</h3>
+  {% for d in view.get('doctors', []) %}<p>Dr. {{ d.name }} — {{ d.spec }}</p>{% else %}<p class="muted">No connected doctor.</p>{% endfor %}
+  <a class="btn btn-sm btn-outline" href="{{ url_for('family.conversations', fm=fm.id) }}">View conversations (read-only)</a></div>
+{% endif %}
+{% if perm.emergency_alerts and not view.get('emergency_now') %}
+<div class="card"><h3>Emergency status</h3><p>✅ No active emergency alerts.</p></div>
+{% endif %}
+{% include "_ai_disclaimer.html" %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Doctor Registration — LifeTwin AI{% endblock %}
+{% block content %}
+<div class="card" style="max-width:560px; margin:0 auto;">
+  <h2>Doctor registration</h2>
+  <p class="muted small">Create a professional account for the LifeTwin AI Doctor Portal. New accounts start as
+     <b>PENDING</b> and become visible to patients after an administrator verifies them.</p>
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Full Name</label><input type="text" name="full_name" value="{{ f.get('full_name','') }}" required>
+    <label>Email</label><input type="email" name="email" value="{{ f.get('email','') }}" required>
+    <label>Phone</label><input type="text" name="phone" value="{{ f.get('phone','') }}" required>
+    <label>Password (min 8 characters)</label><input type="password" name="password" minlength="8" required>
+    <label>Specialization</label><input type="text" name="specialization" value="{{ f.get('specialization','') }}" placeholder="e.g. Cardiologist" required>
+    <label>Qualification</label><input type="text" name="qualification" value="{{ f.get('qualification','') }}" placeholder="e.g. MBBS, MD (Cardiology)" required>
+    <label>Hospital / Clinic</label><input type="text" name="hospital" value="{{ f.get('hospital','') }}" required>
+    <label>Years of Experience</label><input type="number" name="experience_years" min="0" max="70" value="{{ exp if exp is not none else '' }}" required>
+    <label>Medical Registration / License Number</label><input type="text" name="license_number" value="{{ f.get('license_number','') }}" required>
+    <button class="btn" type="submit">Register as Doctor</button>
+  </form>
+  <p style="margin-top:14px;">Already registered? <a href="{{ url_for('eco_auth.doctor_login') }}">Doctor login</a></p>
+</div>
+{% endblock %}

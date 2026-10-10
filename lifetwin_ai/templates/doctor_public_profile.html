@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Dr. {{ doctor.user.full_name }} — LifeTwin AI{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('pt.doctors') }}">← Find a doctor</a></p>
+<div class="card" style="max-width:640px;">
+  <h2>Dr. {{ doctor.user.full_name }}</h2>
+  <dl class="kv">
+    <dt>Specialization</dt><dd>{{ doctor.specialization }}</dd>
+    <dt>Qualification</dt><dd>{{ doctor.qualification }}</dd>
+    <dt>Hospital / Clinic</dt><dd>{{ doctor.hospital }}</dd>
+    <dt>Experience</dt><dd>{{ doctor.experience_years }} years</dd>
+    <dt>Doctor ID</dt><dd>{{ doctor.doctor_code }}</dd>
+    <dt>Verification</dt><dd><span class="pill pill-{{ doctor.verification_status|lower }}">{{ doctor.verification_status }}</span> <span class="muted small">application-level status</span></dd>
+  </dl>
+  {% if doctor.bio %}<p>{{ doctor.bio }}</p>{% endif %}
+  <div class="safety-note">Connecting lets this doctor view your LifeTwin health data (vitals, labs, symptoms, history and AI analysis) and message you. You can disconnect at any time.</div>
+  {% if conn and conn.status == 'ACCEPTED' %}
+    <span class="pill pill-accepted">Connected</span> <a class="btn btn-sm" href="{{ url_for('pt.thread', doctor_id=doctor.id) }}">💬 Message</a>
+  {% elif conn and conn.status == 'PENDING' %}<span class="pill pill-pending">Request pending</span>
+  {% elif conn and conn.status == 'BLOCKED' %}<p class="muted">You cannot send a request to this doctor.</p>
+  {% else %}
+  <form method="POST" action="{{ url_for('pt.request_connection', doctor_id=doctor.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn" type="submit">Request Connection</button>
+  </form>{% endif %}
+</div>
+{% endblock %}

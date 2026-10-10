@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Doctor Login — LifeTwin AI{% endblock %}
+{% block content %}
+<div class="card" style="max-width:420px; margin:0 auto;">
+  <h2>Doctor Portal — Login</h2>
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Email</label><input type="email" name="email" required>
+    <label>Password</label><input type="password" name="password" required>
+    <button class="btn" type="submit">Login</button>
+  </form>
+  <p style="margin-top:14px;">New doctor? <a href="{{ url_for('eco_auth.doctor_register') }}">Register here</a></p>
+  <p class="muted small">Patient? <a href="{{ url_for('login') }}">Patient login</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ patient.full_name }} — Health History{% endblock %}
+{% block content %}
+<h1>Health history</h1>
+<p class="muted">{{ patient.full_name }} · Age {{ patient.age }}</p>
+{% include "_patient_tabs.html" %}
+<div class="grid grid-2">
+  <div class="card"><h3>Blood pressure trend</h3><canvas id="cBP" height="150"></canvas></div>
+  <div class="card"><h3>Heart rate trend</h3><canvas id="cHR" height="150"></canvas></div>
+  <div class="card"><h3>SpO2 trend</h3><canvas id="cSP" height="150"></canvas></div>
+  <div class="card"><h3>Blood sugar trend</h3><canvas id="cBS" height="150"></canvas></div>
+  <div class="card"><h3>Weight trend</h3><canvas id="cW" height="150"></canvas>
+    {% if weight_note %}<p class="muted small">{{ weight_note }}</p>{% endif %}</div>
+  <div class="card"><h3>Health score trend</h3><canvas id="cHS" height="150"></canvas></div>
+</div>
+{% if not data.vitals %}<p class="empty">No vital-sign history recorded yet.</p>{% endif %}
+<script>
+const D = {{ data|tojson }};
+function line(id, labels, sets, yopts){
+  const el = document.getElementById(id); if(!el) return;
+  new Chart(el, {type:'line', data:{labels:labels, datasets:sets}, options:{spanGaps:true, scales:{y:yopts||{}}, plugins:{legend:{position:'bottom'}}}});
+}
+const vl = D.vitals.map(v=>v.t);
+line('cBP', vl, [{label:'Systolic',data:D.vitals.map(v=>v.sys),borderColor:'#dc2626',tension:.3},{label:'Diastolic',data:D.vitals.map(v=>v.dia),borderColor:'#0f766e',tension:.3}]);
+line('cHR', vl, [{label:'Heart rate (bpm)',data:D.vitals.map(v=>v.hr),borderColor:'#f59e0b',tension:.3}]);
+line('cSP', vl, [{label:'SpO2 (%)',data:D.vitals.map(v=>v.spo2),borderColor:'#2563eb',tension:.3}]);
+line('cBS', vl, [{label:'Blood sugar (mg/dL)',data:D.vitals.map(v=>v.sugar),borderColor:'#7c3aed',tension:.3}]);
+line('cW', D.weight.map(w=>w.t), [{label:'Weight (kg)',data:D.weight.map(w=>w.v),borderColor:'#14b8a6',tension:.3}]);
+line('cHS', D.score.map(s=>s.t), [{label:'Overall score',data:D.score.map(s=>s.v),borderColor:'#0f766e',tension:.3}], {min:0,max:100});
+</script>
+{% endblock %}

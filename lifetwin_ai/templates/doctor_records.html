@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Health Records — LifeTwin AI{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Health records — connected patients</h2>
+  {% if rows %}
+  <table>
+    <tr><th>Patient</th><th>Last vitals</th><th>Last labs</th><th>Last symptoms</th><th>Lab files</th><th></th></tr>
+    {% for r in rows %}
+    <tr><td>{{ r.user.full_name }}</td>
+      <td class="small">{{ r.vitals.strftime('%d %b %Y') if r.vitals else '—' }}</td>
+      <td class="small">{{ r.labs.strftime('%d %b %Y') if r.labs else '—' }}</td>
+      <td class="small">{{ r.symptoms.strftime('%d %b %Y') if r.symptoms else '—' }}</td>
+      <td>{{ r.files }}</td>
+      <td class="row-actions">
+        <a class="btn btn-sm" href="{{ url_for('doctor.patient_overview', pid=r.user.id) }}">Profile</a>
+        <a class="btn btn-sm btn-outline" href="{{ url_for('doctor.patient_history', pid=r.user.id) }}">History</a>
+        <a class="btn btn-sm btn-outline" href="{{ url_for('doctor.patient_timeline', pid=r.user.id) }}">Timeline</a>
+      </td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="empty">No connected patients.</p>{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Doctor Conversations — LifeTwin AI{% endblock %}
+{% block content %}
+{% include "_family_header.html" %}
+<div class="notice">Read-only view shared by {{ patient_name }}. You cannot reply, and attachments are not available to family members.</div>
+{% for c in convs %}
+<div class="card"><h3>Dr. {{ c.doctor.user.full_name }} — {{ c.doctor.specialization }}</h3>
+  <div class="chat-box" style="height:auto; max-height:50vh;">
+    {% for m in c.messages %}<div class="msg {{ 'mine' if m.sender_user_id == fm.patient_id }}">
+      <div class="meta">{{ m.sender.full_name }} · {{ m.created_at.strftime('%d %b %H:%M') }}</div>
+      {% if m.message %}<div class="body">{{ m.message }}</div>{% endif %}
+      {% if m.attachment_original_name %}<div class="small muted">📎 {{ m.attachment_original_name }} (shared file)</div>{% endif %}</div>
+    {% else %}<p class="empty">No messages.</p>{% endfor %}
+  </div></div>
+{% else %}<div class="card"><p class="empty">No conversations.</p></div>{% endfor %}
+{% endblock %}

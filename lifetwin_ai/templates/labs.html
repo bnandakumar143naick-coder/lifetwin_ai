@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Lab Reports — LifeTwin AI{% endblock %}
+{% block content %}
+<h1>Laboratory Reports</h1>
+<p>Enter values from your latest lab report, and optionally upload the report file for your records. These improve prediction accuracy.</p>
+
+<div class="card" style="max-width:600px;">
+  <form method="POST" enctype="multipart/form-data">
+    <label>HbA1c (%)</label>
+    <input type="number" step="0.1" name="hba1c" placeholder="e.g. 5.4">
+    <label>Fasting Blood Sugar (mg/dL)</label>
+    <input type="number" step="0.1" name="fasting_blood_sugar" placeholder="e.g. 92">
+    <label>Total Cholesterol (mg/dL)</label>
+    <input type="number" step="0.1" name="total_cholesterol" placeholder="e.g. 190">
+    <label>Hemoglobin (g/dL)</label>
+    <input type="number" step="0.1" name="hemoglobin" placeholder="e.g. 13.5">
+    <label>Creatinine (mg/dL)</label>
+    <input type="number" step="0.01" name="creatinine" placeholder="e.g. 0.9">
+    <label>Liver ALT (U/L)</label>
+    <input type="number" step="0.1" name="liver_alt" placeholder="e.g. 25">
+    <label>Kidney eGFR</label>
+    <input type="number" step="0.1" name="kidney_egfr" placeholder="e.g. 95">
+
+    <label>Upload Report File (optional — PDF/image)</label>
+    <input type="file" name="report_file" accept=".pdf,.jpg,.jpeg,.png">
+
+    <button class="btn" type="submit">Save Lab Report</button>
+  </form>
+</div>
+{% endblock %}

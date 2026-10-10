@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Doctor Dashboard — LifeTwin AI{% endblock %}
+{% block content %}
+<div class="portal-banner">
+  <h1>LIFE TWIN AI · DOCTOR PORTAL</h1>
+  <p>Welcome, Dr. {{ current_user.full_name }} · {{ doctor.specialization }} · <span class="pill pill-{{ doctor.verification_status|lower }}">{{ doctor.verification_status }}</span></p>
+</div>
+
+{% if not doctor.is_verified %}
+<div class="notice">Your account status is <b>{{ doctor.verification_status }}</b>. Patients can find you and you can view patient data only after an administrator marks your account <b>VERIFIED</b>.
+  (Verification here is an application-level status; no external licence check is performed.)</div>
+{% endif %}
+
+<div class="stat-grid">
+  <div class="stat"><div class="num">{{ stats.patients }}</div><div class="lbl">Patients</div></div>
+  <a class="stat" href="{{ url_for('doctor.requests_page') }}"><div class="num">{{ stats.pending }}</div><div class="lbl">Pending Requests</div></a>
+  <a class="stat" href="{{ url_for('doctor.messages_index') }}"><div class="num">{{ stats.unread }}</div><div class="lbl">Unread Messages</div></a>
+  <a class="stat {{ 'danger' if stats.emergency }}" href="{{ url_for('doctor.alerts') }}"><div class="num">{{ stats.emergency }}</div><div class="lbl">Emergency Alerts</div></a>
+</div>
+
+<div class="card">
+  <h2>My patients</h2>
+  {% include "_doctor_patient_table.html" %}
+</div>
+{% include "_ai_disclaimer.html" %}
+{% endblock %}

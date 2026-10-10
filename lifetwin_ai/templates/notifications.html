@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Notifications — LifeTwin AI{% endblock %}
+{% block content %}
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+    <h2 style="margin:0;">🔔 Notifications</h2>
+    {% if unread_notifications %}
+    <form method="POST" action="{{ url_for('common.notifications_read_all') }}" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-outline" type="submit">Mark all as read</button>
+    </form>{% endif %}
+  </div>
+  {% for n in items %}
+  <div class="notif {{ 'unread' if not n.is_read }} {{ 'emergency' if n.notification_type == 'EMERGENCY' }}">
+    <div>{{ n.message }}<small>{{ n.created_at.strftime('%d %b %Y, %H:%M') }} · {{ n.notification_type.replace('_',' ').title() }}</small></div>
+    <form method="POST" action="{{ url_for('common.notification_open', nid=n.id) }}" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-outline" type="submit">Open</button>
+    </form>
+  </div>
+  {% else %}<p class="empty">You're all caught up.</p>{% endfor %}
+</div>
+{% endblock %}

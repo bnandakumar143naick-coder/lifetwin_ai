@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}My Account — LifeTwin AI{% endblock %}
+{% block content %}
+<div class="card" style="max-width:520px; margin:0 auto;">
+  <h2>My account</h2>
+  <dl class="kv">
+    <dt>Name</dt><dd>{{ current_user.full_name }}</dd>
+    <dt>Email</dt><dd>{{ current_user.email }}</dd>
+    <dt>Role</dt><dd>{{ current_user.role.title() }}</dd>
+  </dl>
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Phone</label><input type="text" name="phone" value="{{ current_user.phone or '' }}">
+    <h3 style="margin-top:22px;">Change password</h3>
+    <label>Current password</label><input type="password" name="current_password">
+    <label>New password (min 8 characters)</label><input type="password" name="new_password" minlength="8">
+    <label>Confirm new password</label><input type="password" name="confirm_password">
+    <button class="btn" type="submit">Save</button>
+  </form>
+</div>
+{% endblock %}

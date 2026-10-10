@@ -1,69 +1,37 @@
 {% extends "base.html" %}
 {% block title %}LifeTwin AI — Your Digital Health Twin{% endblock %}
 {% block content %}
-
-<section class="hero">
-    <div>
-        <div class="hero-eyebrow">Preventive Healthcare, Powered by AI</div>
-        <h1>Meet the digital twin of your health — before disease does.</h1>
-        <p class="lead">LifeTwin AI builds a living profile of your body from what you already know: your vitals, habits, and history. No wearables required. Just answers about what's coming, and what to do about it.</p>
-        <div class="hero-actions">
-            <a href="{{ url_for('register') }}" class="btn btn-primary">Create your Health Twin</a>
-            <a href="{{ url_for('login') }}" class="btn btn-secondary">I already have an account</a>
-        </div>
-    </div>
-    <div class="hero-visual">
-        <div class="twin-ring">🫀</div>
-        <div class="hero-stats">
-            <div><strong>13</strong>Health Modules</div>
-            <div><strong>0</strong>Wearables Needed</div>
-            <div><strong>10+</strong>Diseases Tracked</div>
-        </div>
-    </div>
-</section>
-
-<h2 class="section-title">What your Health Twin does</h2>
-<div class="feature-grid">
-    <div class="feature-card">
-        <span class="icon">📋</span>
-        <h3>Manual Health Profile</h3>
-        <p>Enter your vitals, lifestyle, and medical history yourself — built for places where smartwatches aren't the norm.</p>
-    </div>
-    <div class="feature-card">
-        <span class="icon">🧠</span>
-        <h3>Explainable AI Scoring</h3>
-        <p>Get a Physical, Nutrition, Sleep, Hydration, and Mental Wellness score — each one with the reasons behind it.</p>
-    </div>
-    <div class="feature-card">
-        <span class="icon">🩺</span>
-        <h3>Symptom Analysis</h3>
-        <p>Log symptoms and get possible conditions, a risk level, and clear next steps — not a diagnosis, a direction.</p>
-    </div>
-    <div class="feature-card">
-        <span class="icon">📈</span>
-        <h3>Future Disease Risk</h3>
-        <p>See your current and 5-year risk for conditions like diabetes, hypertension, and heart disease — with reasons why.</p>
-    </div>
-    <div class="feature-card">
-        <span class="icon">🥗</span>
-        <h3>Personalized Prevention Plan</h3>
-        <p>A diet, exercise, and lifestyle plan generated around your real numbers — not generic advice.</p>
-    </div>
-    <div class="feature-card">
-        <span class="icon">🚨</span>
-        <h3>Emergency Detection</h3>
-        <p>Dangerous vitals trigger an immediate alert, so nothing critical slips through unnoticed.</p>
-    </div>
-    <div class="feature-card">
-        <span class="icon">💬</span>
-        <h3>AI Health Coach</h3>
-        <p>Ask "Why is my blood pressure high?" and get an answer grounded in your own health data.</p>
-    </div>
-    <div class="feature-card">
-        <span class="icon">📄</span>
-        <h3>Downloadable Reports</h3>
-        <p>Export a complete PDF health report to share with your doctor or keep for your records.</p>
-    </div>
+<div class="hero">
+  <h1>Meet Your Digital Health Twin</h1>
+  <p>LifeTwin AI predicts future health risks before they become diseases — no smartwatch required.
+     Just enter your health details manually and let AI guide your prevention journey.</p>
+  <a href="{{ url_for('register') }}" class="btn">Create My Health Twin</a>
 </div>
 
+<div class="feature-list">
+  <div class="card">
+    <h3>📊 AI Health Score</h3>
+    <p>Get an explainable score across fitness, nutrition, sleep, hydration and mental wellness — with reasons for every number.</p>
+  </div>
+  <div class="card">
+    <h3>🔮 Future Disease Risk</h3>
+    <p>See your current and projected risk for diabetes, hypertension, heart disease and more — explained in plain language.</p>
+  </div>
+  <div class="card">
+    <h3>🥗 Personalized Plans</h3>
+    <p>Diet, exercise and lifestyle plans built around your own profile and risk factors.</p>
+  </div>
+  <div class="card">
+    <h3>🚨 Emergency Alerts</h3>
+    <p>Dangerous vital signs are flagged immediately, with guidance to seek medical attention.</p>
+  </div>
+  <div class="card">
+    <h3>💬 AI Health Coach</h3>
+    <p>Ask questions like "Why is my blood pressure high?" and get answers grounded in your own data.</p>
+  </div>
+  <div class="card">
+    <h3>📄 Downloadable Reports</h3>
+    <p>Export a complete PDF health report to share with family or your doctor.</p>
+  </div>
+</div>
 {% endblock %}
